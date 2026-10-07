@@ -1,0 +1,32 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ..:/workspace:cached
+      - cargo-registry:/usr/local/cargo/registry
+      - cargo-git:/usr/local/cargo/git
+      - cargo-target:/cargo-target
+    command: sleep infinity
+    environment:
+      RUST_LOG: info,axum_api=debug
+      SERVER_ADDR: 0.0.0.0:3000
+      DB_BACKEND: surreal
+      SURREAL_URL: ws://surrealdb:8000
+      SURREAL_USER: root
+      SURREAL_PASS: root
+      CARGO_TARGET_DIR: /cargo-target
+    depends_on:
+      - surrealdb
+
+  surrealdb:
+    image: surrealdb/surrealdb:latest
+    command: start --user root --pass root --bind 0.0.0.0:8000
+    ports:
+      - "8000:8000"
+
+volumes:
+  cargo-registry:
+  cargo-git:
+  cargo-target:
