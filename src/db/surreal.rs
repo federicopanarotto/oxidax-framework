@@ -1,15 +1,15 @@
-use std::sync::Arc;
-
 use surrealdb::Surreal;
 use surrealdb::engine::any::Any;
 use surrealdb::opt::auth::Root;
+use surrealdb::types::{RecordIdKey, ToSql};
 
-use crate::api::reports::report_repository::ReportRepository;
-use crate::api::reports::surreal_report_repository::SurrealReportRepository;
 use crate::config::Config;
 use crate::errors::{AppError, AppResult};
 
-pub async fn connect(url: &str, config: &Config) -> AppResult<Arc<dyn ReportRepository>> {
+/// Apre la connessione a SurrealDB e imposta il namespace/database.
+///
+/// La connessione è condivisa da tutti i repository dell'applicazione.
+pub async fn connect(url: &str, config: &Config) -> AppResult<Surreal<Any>> {
     let db = Surreal::<Any>::init();
 
     db.connect(url).await.map_err(into_db_error)?;
@@ -30,10 +30,26 @@ pub async fn connect(url: &str, config: &Config) -> AppResult<Arc<dyn ReportRepo
 
     tracing::info!(url, ns = %config.surreal_ns, db = %config.surreal_db, "connected to SurrealDB");
 
-    let repository = SurrealReportRepository::new(db);
-    repository.ensure_schema().await?;
+    Ok(db)
+}
 
-    Ok(Arc::new(repository))
+/// Crea la tabella se non esiste: SurrealDB 3 non crea tabelle implicitamente.
+pub async fn define_table(db: &Surreal<Any>, table: &str) -> AppResult<()> {
+    db.query(format!("DEFINE TABLE IF NOT EXISTS {table} SCHEMALESS"))
+        .await?
+        .check()?;
+    Ok(())
+}
+
+/// Converte la chiave di un record id nel solo valore usato dall'API (`uuid`),
+/// non nel formato completo `table:uuid`.
+pub fn record_key_to_string(key: RecordIdKey) -> String {
+    match key {
+        RecordIdKey::String(value) => value,
+        RecordIdKey::Uuid(value) => value.to_string(),
+        RecordIdKey::Number(value) => value.to_string(),
+        other => other.to_sql(),
+    }
 }
 
 fn needs_auth(url: &str) -> bool {

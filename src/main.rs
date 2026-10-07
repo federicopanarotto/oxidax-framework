@@ -1,11 +1,7 @@
-use axum::Router;
 use tracing_subscriber::EnvFilter;
 
 use axum_api::api;
-use axum_api::api::reports::report_controller::ReportController;
-use axum_api::api::reports::report_service::ReportService;
 use axum_api::config::Config;
-use axum_api::db;
 
 #[tokio::main]
 async fn main() {
@@ -18,11 +14,9 @@ async fn main() {
 
     let config = Config::from_env();
 
-    let repository = db::report_repository(&config)
+    let app = api::router::build(&config)
         .await
-        .expect("impossibile connettersi al database");
-
-    let app: Router = api::router(ReportController::new(ReportService::new(repository)));
+        .expect("impossibile avviare l'applicazione");
 
     let listener = tokio::net::TcpListener::bind(&config.server_addr)
         .await

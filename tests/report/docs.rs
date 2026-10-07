@@ -48,7 +48,11 @@ async fn swagger_and_health_are_available() {
     let paths = spec["paths"].as_object().unwrap();
     assert!(paths.contains_key("/api/reports"));
     assert!(paths.contains_key("/api/reports/{id}"));
+    assert!(paths.contains_key("/api/categories"));
+    assert!(paths.contains_key("/api/categories/{id}"));
 
     let schemas = spec["components"]["schemas"].as_object().unwrap();
     assert!(schemas.contains_key("ErrorResponse"));
+    assert!(schemas.contains_key("ReportResponse"));
+    assert!(schemas.contains_key("CategoryResponse"));
 }

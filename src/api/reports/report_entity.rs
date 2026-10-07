@@ -7,4 +7,6 @@ pub struct Report {
     pub id: String,
     pub name: String,
     pub description: String,
+    /// Id della categoria associata (`None` se il report non ha categoria).
+    pub category_id: Option<String>,
 }

@@ -18,6 +18,14 @@ pub enum DbBackend {
 }
 
 impl Config {
+    /// Configurazione con backend in-memory (test e `DB_BACKEND=memory`).
+    pub fn memory() -> Self {
+        Self {
+            db_backend: DbBackend::Memory,
+            ..Self::from_env()
+        }
+    }
+
     pub fn from_env() -> Self {
         let db_backend = match env::var("DB_BACKEND").unwrap_or_else(|_| "surreal".into()) {
             s if s.eq_ignore_ascii_case("memory") => DbBackend::Memory,

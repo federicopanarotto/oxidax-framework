@@ -1,19 +1,38 @@
-//! Utilità condivise dai test: applica app, parsing dei body JSON e
-//! costruzione delle richieste.
+//! Utilità condivise dai test: applicazione app, repository in-memory,
+//! parsing dei body JSON e costruzione delle richieste.
 
 use axum::Router;
 use axum::body::{Body, to_bytes};
 use axum::http::Request;
 use axum_api::api;
-use axum_api::api::reports::report_controller::ReportController;
+use axum_api::api::categories::category_service::CategoryService;
 use axum_api::api::reports::report_service::ReportService;
+use axum_api::config::Config;
 use axum_api::db;
+use axum_api::db::Repositories;
 use serde_json::Value;
 
-/// App con repository in-memory (SurrealDB `mem://`).
+/// Repository in-memory condivisi (SurrealDB `mem://`) da tutte le feature.
+pub async fn repositories() -> Repositories {
+    db::memory_repositories()
+        .await
+        .expect("memory repositories")
+}
+
+/// Service dei report con le dipendenze reali (category service incluso).
+pub async fn report_service() -> ReportService {
+    let repositories = repositories().await;
+    ReportService::new(
+        repositories.reports,
+        CategoryService::new(repositories.categories),
+    )
+}
+
+/// App con backend in-memory, costruita dal router generale come fa `main`.
 pub async fn app() -> Router {
-    let repository = db::memory_repository().await.expect("memory repository");
-    api::router(ReportController::new(ReportService::new(repository)))
+    api::router::build(&Config::memory())
+        .await
+        .expect("applicazione")
 }
 
 /// Legge il body della risposta come JSON.

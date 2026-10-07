@@ -2,10 +2,11 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use surrealdb::Surreal;
 use surrealdb::engine::any::Any;
-use surrealdb::types::{RecordId, RecordIdKey, SurrealValue, ToSql};
+use surrealdb::types::{RecordId, SurrealValue};
 
 use crate::api::reports::report_entity::Report;
 use crate::api::reports::report_repository::ReportRepository;
+use crate::db::{define_table, record_key_to_string};
 use crate::errors::{AppError, AppResult};
 
 const TABLE: &str = "report";
@@ -16,6 +17,7 @@ struct ReportRow {
     id: RecordId,
     name: String,
     description: String,
+    category_id: Option<String>,
 }
 
 /// Contenuto persistibile: l'id è gestito dal database, non va scritto nel CONTENT.
@@ -23,6 +25,7 @@ struct ReportRow {
 struct ReportContent {
     name: String,
     description: String,
+    category_id: Option<String>,
 }
 
 pub struct SurrealReportRepository {
@@ -36,11 +39,7 @@ impl SurrealReportRepository {
 
     /// Crea la tabella se non esiste: SurrealDB 3 non crea tabelle implicitamente.
     pub async fn ensure_schema(&self) -> AppResult<()> {
-        self.db
-            .query(format!("DEFINE TABLE IF NOT EXISTS {TABLE} SCHEMALESS"))
-            .await?
-            .check()?;
-        Ok(())
+        define_table(&self.db, TABLE).await
     }
 }
 
@@ -50,15 +49,7 @@ fn into_entity(row: ReportRow) -> Report {
         id: record_key_to_string(row.id.key),
         name: row.name,
         description: row.description,
-    }
-}
-
-fn record_key_to_string(key: RecordIdKey) -> String {
-    match key {
-        RecordIdKey::String(value) => value,
-        RecordIdKey::Uuid(value) => value.to_string(),
-        RecordIdKey::Number(value) => value.to_string(),
-        other => other.to_sql(),
+        category_id: row.category_id,
     }
 }
 
@@ -79,6 +70,7 @@ impl ReportRepository for SurrealReportRepository {
         let content = ReportContent {
             name: report.name.clone(),
             description: report.description.clone(),
+            category_id: report.category_id.clone(),
         };
 
         let created: Option<ReportRow> = self
@@ -104,6 +96,7 @@ impl ReportRepository for SurrealReportRepository {
         let content = ReportContent {
             name: report.name.clone(),
             description: report.description.clone(),
+            category_id: report.category_id.clone(),
         };
 
         let updated: Option<ReportRow> = self.db.update((TABLE, id)).content(content).await?;

@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use uuid::Uuid;
 
+use crate::api::categories::category_service::CategoryService;
 use crate::api::reports::report_dto::{CreateReportDto, ReportResponse, UpdateReportDto};
 use crate::api::reports::report_entity::Report;
 use crate::api::reports::report_repository::ReportRepository;
@@ -13,18 +14,27 @@ const DESCRIPTION_MAX_LEN: usize = 2000;
 #[derive(Clone)]
 pub struct ReportService {
     repository: Arc<dyn ReportRepository>,
+    categories: CategoryService,
 }
 
 impl ReportService {
-    pub fn new(repository: Arc<dyn ReportRepository>) -> Self {
-        Self { repository }
+    pub fn new(repository: Arc<dyn ReportRepository>, categories: CategoryService) -> Self {
+        Self {
+            repository,
+            categories,
+        }
     }
 
     pub async fn create(&self, dto: CreateReportDto) -> AppResult<ReportResponse> {
+        let name = validate_name(&dto.name)?;
+        let description = validate_description(&dto.description)?;
+        let category_id = self.validate_category_id(dto.category_id).await?;
+
         let report = Report {
             id: Uuid::new_v4().to_string(),
-            name: validate_name(&dto.name)?,
-            description: validate_description(&dto.description)?,
+            name,
+            description,
+            category_id,
         };
 
         self.repository.insert(report).await.map(Into::into)
@@ -46,10 +56,15 @@ impl ReportService {
     }
 
     pub async fn update(&self, id: &str, dto: UpdateReportDto) -> AppResult<ReportResponse> {
+        let name = validate_name(&dto.name)?;
+        let description = validate_description(&dto.description)?;
+        let category_id = self.validate_category_id(dto.category_id).await?;
+
         let report = Report {
             id: id.to_string(),
-            name: validate_name(&dto.name)?,
-            description: validate_description(&dto.description)?,
+            name,
+            description,
+            category_id,
         };
 
         self.repository
@@ -65,6 +80,28 @@ impl ReportService {
         } else {
             Err(not_found(id))
         }
+    }
+
+    /// Valida la relazione con le categorie.
+    ///
+    /// Un `category_id` vuoto o assente normalizza a `None`; se presente deve
+    /// riferire a una categoria esistente, altrimenti l'errore è una
+    /// `validation_error` (400) perché il campo non passa la validazione.
+    async fn validate_category_id(&self, category_id: Option<String>) -> AppResult<Option<String>> {
+        let Some(category_id) = category_id
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty())
+        else {
+            return Ok(None);
+        };
+
+        if !self.categories.exists(&category_id).await? {
+            return Err(AppError::Validation(format!(
+                "category {category_id} not found"
+            )));
+        }
+
+        Ok(Some(category_id))
     }
 }
 

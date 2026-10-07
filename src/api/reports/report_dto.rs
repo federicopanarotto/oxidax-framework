@@ -9,6 +9,9 @@ pub struct CreateReportDto {
     /// Descrizione del report
     #[schema(example = "Report sulle vendite del mese corrente")]
     pub description: String,
+    /// Id della categoria associata (opzionale)
+    #[schema(example = "550e8400-e29b-41d4-a716-446655440000")]
+    pub category_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -19,6 +22,9 @@ pub struct UpdateReportDto {
     /// Nuova descrizione del report
     #[schema(example = "Report sulle vendite del trimestre corrente")]
     pub description: String,
+    /// Id della categoria associata (opzionale; `null` o assente rimuove la relazione)
+    #[schema(example = "550e8400-e29b-41d4-a716-446655440000")]
+    pub category_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -32,6 +38,9 @@ pub struct ReportResponse {
     /// Descrizione del report
     #[schema(example = "Report sulle vendite del mese corrente")]
     pub description: String,
+    /// Id della categoria associata (opzionale)
+    #[schema(example = "550e8400-e29b-41d4-a716-446655440000")]
+    pub category_id: Option<String>,
 }
 
 impl From<crate::api::reports::report_entity::Report> for ReportResponse {
@@ -40,6 +49,7 @@ impl From<crate::api::reports::report_entity::Report> for ReportResponse {
             id: report.id,
             name: report.name,
             description: report.description,
+            category_id: report.category_id,
         }
     }
 }
