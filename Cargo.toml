@@ -10,14 +10,16 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 utoipa = { version = "6", features = ["axum_extras"] }
 utoipa-swagger-ui = { version = "10", features = ["axum"] }
+utoipa-axum = "0.3"
+inventory = "0.3"
 surrealdb = { version = "3.3", features = ["kv-mem"] }
-uuid = { version = "1", features = ["v4"] }
+uuid = { version = "1", features = ["v4", "serde"] }
 async-trait = "0.1"
 thiserror = "2"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 more-di = { version = "3", features = ["async"] }
-validator = { version = "0.20", features = ["derive"] }
+validator = { version = "0.21", features = ["derive"] }
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }

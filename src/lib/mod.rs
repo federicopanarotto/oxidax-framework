@@ -1,10 +1,12 @@
-//! Libreria condivisa di validazione dell'API.
+//! Shared API validation library.
 //!
-//! Espone gli estrattori [`ValidatedJson`], [`ValidatedQuery`] e
-//! [`ValidatedParams`] (i "middleware" di validazione che girano *prima* della
-//! logica del controller) e i validatori condivisi da riusare in ogni feature.
+//! Exposes the [`ValidatedJson`], [`ValidatedQuery`] and
+//! [`ValidatedParams`] extractors (the validation "middleware" that runs
+//! *before* the controller logic) and the shared validators to be reused in
+//! every feature.
 
 pub mod middlewares;
+pub mod registry;
 pub mod validators;
 
 pub use middlewares::validation_middleware::{

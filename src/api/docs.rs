@@ -1,15 +1,13 @@
 use utoipa::OpenApi;
+use utoipa::openapi::OpenApi as Spec;
 use utoipa_swagger_ui::SwaggerUi;
 
-use crate::api::categories::category_controller;
-use crate::api::categories::category_dto::{
-    CategoryResponse, CreateCategoryDto, UpdateCategoryDto,
-};
-use crate::api::reports::report_controller;
-use crate::api::reports::report_dto::{CreateReportDto, ReportResponse, UpdateReportDto};
-use crate::errors::{BadRequestResponse, ErrorResponse};
-use crate::lib::ValidationErrorResponse;
-
+/// Documentation base: info, tags and shared components.
+///
+/// The paths and schemas of individual features are NOT listed here: they
+/// arrive automatically from the features themselves (the `#[utoipa::path]`
+/// handlers collected by `utoipa-axum`), so `docs.rs` never needs to be
+/// touched when adding a feature.
 #[derive(OpenApi)]
 #[openapi(
     info(
@@ -21,34 +19,22 @@ use crate::lib::ValidationErrorResponse;
         (name = "reports", description = "Gestione dei report"),
         (name = "categories", description = "Gestione delle categorie"),
     ),
-    paths(
-        report_controller::create_report,
-        report_controller::list_reports,
-        report_controller::get_report,
-        report_controller::update_report,
-        report_controller::delete_report,
-        category_controller::create_category,
-        category_controller::list_categories,
-        category_controller::get_category,
-        category_controller::update_category,
-        category_controller::delete_category,
-    ),
-    components(schemas(
-        ReportResponse,
-        CreateReportDto,
-        UpdateReportDto,
-        CategoryResponse,
-        CreateCategoryDto,
-        UpdateCategoryDto,
-        ErrorResponse,
-        ValidationErrorResponse,
-        BadRequestResponse,
-    ))
 )]
 pub struct ApiDoc;
 
-/// Documentazione live servita dalla UI Swagger: la specifica OpenAPI è
-/// generata a runtime da `ApiDoc` senza scrivere alcun file su disco.
-pub fn swagger_router() -> SwaggerUi {
-    SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi())
+/// Merges the OpenAPI components produced by individual features into the
+/// base document (info + tags + shared schemas).
+pub fn build(feature_apis: Vec<Spec>) -> Spec {
+    let mut api = ApiDoc::openapi();
+    for feature in feature_apis {
+        api.merge(feature);
+    }
+    api
+}
+
+/// Live documentation served by the Swagger UI: the OpenAPI spec is
+/// generated at runtime and served at `/api-docs/openapi.json` without
+/// writing any file to disk.
+pub fn swagger_router(api: Spec) -> SwaggerUi {
+    SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", api)
 }

@@ -1,13 +1,13 @@
-//! Validatori condivisi e formattazione degli errori del crate `validator`.
+//! Shared validators and error formatting for the `validator` crate.
 //!
-//! Le funzioni qui sono riutilizzabili in ogni feature via decoratore
-//! `#[validate(custom(function = ...))]` sui campi dei DTO.
+//! The functions here are reusable in every feature via the
+//! `#[validate(custom(function = ...))]` decorator on DTO fields.
 
 use uuid::Uuid;
 use validator::ValidationError;
 
-/// Formatta gli errori di `validator` in una lista di stringhe leggibili nel
-/// formato `campo: messaggio, messaggio`.
+/// Formats `validator` errors into a list of human-readable strings in the
+/// `field: message, message` format.
 pub fn format_validation_errors(errors: validator::ValidationErrors) -> Vec<String> {
     errors
         .field_errors()
@@ -28,12 +28,12 @@ pub fn format_validation_errors(errors: validator::ValidationErrors) -> Vec<Stri
         .collect()
 }
 
-/// Usato con `#[validate(custom(function = "crate::lib::validators::not_blank"))]`:
-/// rifiuta stringhe vuote o composte solo da spazi.
+/// Used with `#[validate(custom(function = "crate::lib::validators::not_blank"))]`:
+/// rejects empty strings or strings made only of whitespace.
 ///
-/// Il crate `validator` vuole che un custom validator restituisca
-/// `Result<(), ValidationError>`: il messaggio viene sovrascritto da quello
-/// dichiarato nel decoratore del campo.
+/// The `validator` crate requires a custom validator to return
+/// `Result<(), ValidationError>`: the message is overridden by the one
+/// declared in the field's decorator.
 pub fn not_blank(value: &str) -> Result<(), ValidationError> {
     if value.trim().is_empty() {
         Err(ValidationError::new("not_blank"))
@@ -42,9 +42,9 @@ pub fn not_blank(value: &str) -> Result<(), ValidationError> {
     }
 }
 
-/// Usato con `#[validate(custom(function = "crate::lib::validators::validate_uuid"))]`
-/// sui campi id (anche `Option<String>`): controlla che il valore sia un UUID
-/// valido. Su `None` il crate `validator` non esegue il controllo.
+/// Used with `#[validate(custom(function = "crate::lib::validators::validate_uuid"))]`
+/// on id fields (including `Option<String>`): checks that the value is a valid
+/// UUID. On `None` the `validator` crate skips the check.
 pub fn validate_uuid(value: &str) -> Result<(), ValidationError> {
     if Uuid::parse_str(value).is_err() {
         return Err(ValidationError::new("not_a_uuid"));

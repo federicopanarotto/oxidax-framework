@@ -1,11 +1,11 @@
-//! Estrattori di validazione (body JSON, query string e parametri di path).
+//! Validation extractors (JSON body, query string and path parameters).
 //!
-//! Ogni estrattore deserializza il DTO e ne esegue la validazione con i
-//! decoratori `#[validate(...)]` del crate `validator`, rifiutando la
-//! richiesta con un corpo JSON uniforme prima che il controller venga chiamato:
+//! Each extractor deserializes the DTO and validates it with the
+//! `#[validate(...)]` decorators of the `validator` crate, rejecting the
+//! request with a uniform JSON body before the controller is called:
 //!
-//! - JSON malformato/parsabile: `400 Bad Request`;
-//! - campi non validi: `422 Unprocessable Entity` con i dettagli per campo.
+//! - malformed/unparsable JSON: `400 Bad Request`;
+//! - invalid fields: `422 Unprocessable Entity` with per-field details.
 
 use axum::Json;
 use axum::extract::{FromRequest, FromRequestParts, Path, Query, Request};
@@ -19,23 +19,23 @@ use validator::Validate;
 
 use crate::lib::validators::format_validation_errors;
 
-/// Corpo JSON uniforme degli errori di validazione degli estrattori.
+/// Uniform JSON body of the extractors' validation errors.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct ValidationErrorResponse {
-    /// Descrizione dell'errore (body/query/params)
+    /// Description of the error (body/query/params)
     #[schema(example = "Errore di validazione del Body")]
     pub error: String,
-    /// Dettagli per ogni campo (`campo: messaggio`)
+    /// Details for each field (`field: message`)
     pub details: Vec<String>,
 }
 
-/// DTO validato proveniente dal body JSON.
+/// Validated DTO coming from the JSON body.
 pub struct ValidatedJson<T>(pub T);
 
-/// DTO validato proveniente dalla query string (`?page=1&search=abc`).
+/// Validated DTO coming from the query string (`?page=1&search=abc`).
 pub struct ValidatedQuery<T>(pub T);
 
-/// DTO validato proveniente dai parametri di path (`/api/reports/{id}`).
+/// Validated DTO coming from the path parameters (`/api/reports/{id}`).
 pub struct ValidatedParams<T>(pub T);
 
 impl<T, S> FromRequest<S> for ValidatedJson<T>

@@ -7,7 +7,7 @@ use crate::lib::Validate;
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Validate)]
 pub struct CreateCategoryDto {
-    /// Nome della categoria
+    /// Category name
     #[schema(example = "Vendite", min_length = 1, max_length = 200)]
     #[validate(
         custom(
@@ -20,8 +20,9 @@ pub struct CreateCategoryDto {
 }
 
 impl CreateCategoryDto {
-    /// Converte il DTO nell'entità pronta per il database: genera l'id e
-    /// normalizza il nome (la validazione è già stata fatta dall'extractor).
+    /// Converts the DTO into the entity ready for the database: generates the
+    /// id and normalizes the name (validation was already done by the
+    /// extractor).
     pub fn into_entity(self) -> Category {
         Category {
             id: Uuid::new_v4().to_string(),
@@ -32,7 +33,7 @@ impl CreateCategoryDto {
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Validate)]
 pub struct UpdateCategoryDto {
-    /// Nuovo nome della categoria
+    /// New category name
     #[schema(example = "Marketing", min_length = 1, max_length = 200)]
     #[validate(
         custom(
@@ -45,8 +46,9 @@ pub struct UpdateCategoryDto {
 }
 
 impl UpdateCategoryDto {
-    /// Converte il DTO nell'entità pronta per il database: riusa l'id del path
-    /// e normalizza il nome (la validazione è già stata fatta dall'extractor).
+    /// Converts the DTO into the entity ready for the database: reuses the id
+    /// from the path and normalizes the name (validation was already done by
+    /// the extractor).
     pub fn into_entity(self, id: String) -> Category {
         Category {
             id,
@@ -57,10 +59,10 @@ impl UpdateCategoryDto {
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct CategoryResponse {
-    /// Identificativo UUID della categoria
+    /// UUID identifier of the category
     #[schema(example = "550e8400-e29b-41d4-a716-446655440000")]
     pub id: String,
-    /// Nome della categoria
+    /// Category name
     #[schema(example = "Vendite")]
     pub name: String,
 }

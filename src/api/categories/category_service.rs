@@ -9,11 +9,11 @@ use crate::api::categories::category_dto::{
 use crate::api::categories::category_repository::CategoryRepository;
 use crate::errors::{AppError, AppResult};
 
-/// Regole di business delle categorie.
+/// Business rules for categories.
 ///
-/// I DTO arrivano già convertiti e validati (id generato, trim, decoratori
-/// `#[validate(...)]` degli estrattori `ValidatedJson`): il service scrive
-/// soltanto dati pronti nel repository.
+/// The DTOs arrive already converted and validated (id generated, trimmed,
+/// `#[validate(...)]` decorators of the `ValidatedJson` extractors): the
+/// service only writes ready-made data to the repository.
 #[injectable]
 pub struct CategoryService {
     repository: Arc<dyn CategoryRepository>,
@@ -59,20 +59,20 @@ impl CategoryService {
         }
     }
 
-    /// Verifica l'esistenza di una categoria: usata dal service dei report
-    /// per validare la relazione prima di creare o aggiornare un report.
+    /// Checks whether a category exists: used by the reports service to
+    /// validate the relationship before creating or updating a report.
     pub async fn exists(&self, id: &str) -> AppResult<bool> {
         Ok(self.repository.find_by_id(id).await?.is_some())
     }
 
-    /// Recupera una categoria senza fallire se assente: usata dal service dei
-    /// report per annidare l'oggetto `category` nella response.
+    /// Retrieves a category without failing if absent: used by the reports
+    /// service to nest the `category` object in the response.
     pub async fn find(&self, id: &str) -> AppResult<Option<CategoryResponse>> {
         Ok(self.repository.find_by_id(id).await?.map(Into::into))
     }
 
-    /// Indice `id → categoria`: decora una lista di report con una sola lettura
-    /// evitando N+1 query per ogni elemento.
+    /// `id → category` index: decorates a list of reports with a single read,
+    /// avoiding N+1 queries per element.
     pub async fn by_id(&self) -> AppResult<HashMap<String, CategoryResponse>> {
         let mut index = HashMap::new();
         for category in self.list().await? {

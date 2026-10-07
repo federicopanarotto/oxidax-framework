@@ -4,7 +4,9 @@ use axum::Json;
 use axum::Router;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
-use axum::routing::{get, post};
+use utoipa::openapi::OpenApi;
+use utoipa_axum::router::OpenApiRouter;
+use utoipa_axum::routes;
 
 use crate::api::categories::category_dto::{
     CategoryResponse, CreateCategoryDto, UpdateCategoryDto,
@@ -13,23 +15,18 @@ use crate::api::categories::category_service::CategoryService;
 use crate::errors::{AppResult, BadRequestResponse, ErrorResponse};
 use crate::lib::{ValidatedJson, ValidationErrorResponse};
 
-/// Tabella delle rotte delle categorie, costruita sul service iniettato come
-/// stato.
+/// Route table (axum) and OpenAPI spec for categories, defined right here,
+/// without an object controller: the handlers are `#[utoipa::path]`
+/// functions that use [`CategoryService`] as state.
 ///
-/// Come per i report gli handler sono funzioni `#[utoipa::path]` che usano
-/// direttamente il [`CategoryService`]: niente controller oggetto; l'extractor
-/// [`ValidatedJson`] applica i decoratori `#[validate(...)]` del DTO prima
-/// dell'esecuzione.
-pub fn router(service: Arc<CategoryService>) -> Router {
-    Router::new()
-        .route("/categories", post(create_category).get(list_categories))
-        .route(
-            "/categories/{id}",
-            get(get_category)
-                .put(update_category)
-                .delete(delete_category),
-        )
+/// Registration in the DI container and in the feature registry (`order` 0)
+/// live in `mod.rs`, so `features.rs`/`router.rs`/`docs.rs` never change.
+pub fn build_router(service: Arc<CategoryService>) -> (Router, OpenApi) {
+    OpenApiRouter::new()
+        .routes(routes!(create_category, list_categories))
+        .routes(routes!(get_category, update_category, delete_category))
         .with_state(service)
+        .split_for_parts()
 }
 
 #[utoipa::path(

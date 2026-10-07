@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
-/// Entità indipendente dal database: qualsiasi repository deve persistere
-/// e restituire esattamente questo tipo.
+/// Database-independent entity: any repository must persist and return
+/// exactly this type.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Category {
     pub id: String,

@@ -1,4 +1,4 @@
-//! Ciclo completo CRUD via HTTP e gestione degli errori di validazione.
+//! Full CRUD cycle over HTTP and validation error handling.
 
 use axum::body::Body;
 use axum::http::{Request, StatusCode};

@@ -1,5 +1,5 @@
-//! Regole di business del service (normalizzazione dei campi e 404), senza
-//! passare dal livello HTTP.
+//! Service business rules (field normalization and 404), without
+//! going through the HTTP layer.
 
 use std::sync::Arc;
 

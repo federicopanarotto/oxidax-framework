@@ -1,9 +1,9 @@
-//! Middleware di validazione: estrattori eseguiti prima del controller.
+//! Validation middleware: extractors run before the controller.
 //!
-//! In axum l'equivalente idiomatico della "middleware chain" di Express per la
-//! validazione è un *extractor*: `ValidatedJson`, `ValidatedQuery` e
-//! `ValidatedParams` estraggono il DTO, lo validano con i decoratori
-//! `#[validate(...)]` e, se qualcosa non passa, rispondono con il corpo
-//! uniforme di errore prima che il metodo del controller venga chiamato.
+//! In axum the idiomatic equivalent of Express's "middleware chain" for
+//! validation is an *extractor*: `ValidatedJson`, `ValidatedQuery` and
+//! `ValidatedParams` extract the DTO, validate it with the
+//! `#[validate(...)]` decorators and, if anything fails, respond with the
+//! uniform error body before the controller method is called.
 
 pub mod validation_middleware;

@@ -6,26 +6,24 @@ use crate::api::features;
 use crate::config::Config;
 use crate::errors::{AppResult, pipeline};
 
-/// Router generale dell'API.
+/// Overall API router.
 ///
-/// Non conosce le classi delle feature: riceve dal container DI i sotto-router
-/// già costruiti e li aggrega sotto `/api`. `main` chiama solo `build`.
+/// It knows nothing about features: it opens the DI provider, has each
+/// feature (self-registered in the registry) build its own router and
+/// OpenAPI components, then aggregates everything under `/api`. The collected
+/// OpenAPI components feed the Swagger UI.
 pub async fn build(config: &Config) -> AppResult<Router> {
-    let features = features::build_features(config).await?;
+    let provider = features::provider(config).await?;
+    let bundles = features::feature_bundles(&provider);
+    let (routers, feature_apis): (Vec<_>, Vec<_>) = bundles.into_iter().unzip();
 
-    let mut router = Router::new().nest("/api", api_router(features));
-    router = router.merge(docs::swagger_router());
-    Ok(router.fallback(pipeline::route_not_found))
-}
-
-/// Aggrega i sotto-router delle feature sotto `/api`: ogni feature registra le
-/// proprie rotte relative (es. `/reports`, `/categories`).
-fn api_router(features: Vec<Router<()>>) -> Router {
-    let mut router = Router::new().route("/health", get(health));
-    for feature in features {
+    let api = docs::build(feature_apis);
+    let mut router = Router::new().route("/api/health", get(health));
+    for feature in routers {
         router = router.merge(feature);
     }
-    router
+    router = router.merge(docs::swagger_router(api));
+    Ok(router.fallback(pipeline::route_not_found))
 }
 
 async fn health() -> &'static str {

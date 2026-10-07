@@ -4,28 +4,27 @@ use axum::Json;
 use axum::Router;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
-use axum::routing::{get, post};
+use utoipa::openapi::OpenApi;
+use utoipa_axum::router::OpenApiRouter;
+use utoipa_axum::routes;
 
 use crate::api::reports::report_dto::{CreateReportDto, ReportResponse, UpdateReportDto};
 use crate::api::reports::report_service::ReportService;
 use crate::errors::{AppResult, BadRequestResponse, ErrorResponse};
 use crate::lib::{ValidatedJson, ValidationErrorResponse};
 
-/// Tabella delle rotte dei report, costruita sul service iniettato come stato.
+/// Route table (axum) and OpenAPI spec for reports, defined right here,
+/// without an object controller: the handlers are `#[utoipa::path]`
+/// functions that use [`ReportService`] as state.
 ///
-/// Gli handler sottostanti usano direttamente il [`ReportService`]: non esiste
-/// un controller oggetto, sono funzioni `#[utoipa::path]` documentate in
-/// OpenAPI. Prima di ogni handler gira l'extractor [`ValidatedJson`], che
-/// applica i decoratori `#[validate(...)]` dei DTO e risponde con
-/// `{error, details}` se un campo non passa la validazione.
-pub fn router(service: Arc<ReportService>) -> Router {
-    Router::new()
-        .route("/reports", post(create_report).get(list_reports))
-        .route(
-            "/reports/{id}",
-            get(get_report).put(update_report).delete(delete_report),
-        )
+/// Registration in the DI container and in the feature registry (`order` 1)
+/// live in `mod.rs`, so `features.rs`/`router.rs`/`docs.rs` never change.
+pub fn build_router(service: Arc<ReportService>) -> (Router, OpenApi) {
+    OpenApiRouter::new()
+        .routes(routes!(create_report, list_reports))
+        .routes(routes!(get_report, update_report, delete_report))
         .with_state(service)
+        .split_for_parts()
 }
 
 #[utoipa::path(

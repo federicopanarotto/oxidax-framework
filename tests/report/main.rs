@@ -1,5 +1,5 @@
-//! Test di integrazione dell'API: CRUD HTTP dei report e delle categorie,
-//! validazione, relazioni, documentazione.
+//! API integration tests: HTTP CRUD for reports and categories,
+//! validation, relations, documentation.
 
 mod categories;
 mod crud;

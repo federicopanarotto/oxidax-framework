@@ -1,4 +1,4 @@
-//! Health, Swagger UI e specifica OpenAPI.
+//! Health, Swagger UI and OpenAPI specification.
 
 use axum::body::Body;
 use axum::http::{Request, StatusCode};

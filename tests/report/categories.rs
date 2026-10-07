@@ -1,4 +1,4 @@
-//! CRUD delle categorie via HTTP e relazione report → categoria.
+//! Category CRUD over HTTP and the report → category relation.
 
 use axum::body::Body;
 use axum::http::{Request, StatusCode};

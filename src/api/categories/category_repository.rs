@@ -3,11 +3,11 @@ use async_trait::async_trait;
 use crate::api::categories::category_entity::Category;
 use crate::errors::AppResult;
 
-/// Contratto di persistenza per le categorie.
+/// Persistence contract for categories.
 ///
-/// È l'unico punto che dipende dal database: implementando questo trait su un
-/// nuovo backend (Postgres, SQLite, MongoDB...) il service e i controller
-/// restano invariati.
+/// It is the only point that depends on the database: implementing this
+/// trait on a new backend (Postgres, SQLite, MongoDB...) leaves the service
+/// and controllers unchanged.
 #[async_trait]
 pub trait CategoryRepository: Send + Sync {
     async fn insert(&self, category: Category) -> AppResult<Category>;

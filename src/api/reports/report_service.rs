@@ -9,12 +9,12 @@ use crate::api::reports::report_entity::Report;
 use crate::api::reports::report_repository::ReportRepository;
 use crate::errors::{AppError, AppResult};
 
-/// Regole di business dei report.
+/// Business rules for reports.
 ///
-/// I DTO arrivano già convertiti e validati (id generato, trim, formato UUID
-/// verificato dagli estrattori `ValidatedJson`): qui il service si limita a
-/// scrivere dati pronti nel repository. Resta solo la validazione di dominio
-/// che richiede il database (esistenza della categoria).
+/// The DTOs arrive already converted and validated (id generated, trimmed,
+/// UUID format checked by the `ValidatedJson` extractors): here the service
+/// only writes ready-made data to the repository. Only the domain validation
+/// that requires the database remains (existence of the category).
 #[injectable]
 pub struct ReportService {
     repository: Arc<dyn ReportRepository>,
@@ -75,11 +75,11 @@ impl ReportService {
         }
     }
 
-    /// Valida la relazione con le categorie.
+    /// Validates the relationship with categories.
     ///
-    /// Il formato dell'id è già stato verificato a livello di DTO; qui si
-    /// controlla solo l'esistenza della categoria nel database. Se il campo è
-    /// assente (`None`) non c'è nulla da verificare.
+    /// The id format has already been checked at the DTO level; here only the
+    /// existence of the category in the database is verified. If the field is
+    /// absent (`None`) there is nothing to check.
     async fn validate_category_id(&self, category_id: &Option<String>) -> AppResult<()> {
         if let Some(id) = category_id
             && !self.categories.exists(id).await?
@@ -89,7 +89,8 @@ impl ReportService {
         Ok(())
     }
 
-    /// Compone la response annidando l'oggetto `category` (se la relazione esiste).
+    /// Composes the response by nesting the `category` object (if the
+    /// relationship exists).
     async fn decorate(&self, report: Report) -> AppResult<ReportResponse> {
         let category = self.category_of(&report).await?;
         Ok((report, category).into())

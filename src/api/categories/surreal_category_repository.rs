@@ -11,14 +11,15 @@ use crate::errors::{AppError, AppResult};
 
 const TABLE: &str = "category";
 
-/// Riga così come arriva dal database (l'id è un record id SurrealDB).
+/// Row as it arrives from the database (the id is a SurrealDB record id).
 #[derive(Debug, Serialize, Deserialize, SurrealValue)]
 struct CategoryRow {
     id: RecordId,
     name: String,
 }
 
-/// Contenuto persistibile: l'id è gestito dal database, non va scritto nel CONTENT.
+/// Persistable content: the id is managed by the database, it must not be
+/// written in the CONTENT.
 #[derive(Debug, Serialize, Deserialize, SurrealValue)]
 struct CategoryContent {
     name: String,
@@ -33,13 +34,14 @@ impl SurrealCategoryRepository {
         Self { db }
     }
 
-    /// Crea la tabella se non esiste: SurrealDB 3 non crea tabelle implicitamente.
+    /// Creates the table if it does not exist: SurrealDB 3 does not create
+    /// tables implicitly.
     pub async fn ensure_schema(&self) -> AppResult<()> {
         define_table(&self.db, TABLE).await
     }
 }
 
-/// L'API lavora con la sola chiave del record id (`uuid`), non con `table:uuid`.
+/// The API works with the record id key alone (`uuid`), not with `table:uuid`.
 fn into_entity(row: CategoryRow) -> Category {
     Category {
         id: record_key_to_string(row.id.key),
