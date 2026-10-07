@@ -2,6 +2,7 @@ use axum::Router;
 use tracing_subscriber::EnvFilter;
 
 use axum_api::api;
+use axum_api::api::reports::report_controller::ReportController;
 use axum_api::api::reports::report_service::ReportService;
 use axum_api::config::Config;
 use axum_api::db;
@@ -21,7 +22,7 @@ async fn main() {
         .await
         .expect("impossibile connettersi al database");
 
-    let app: Router = api::router(ReportService::new(repository));
+    let app: Router = api::router(ReportController::new(ReportService::new(repository)));
 
     let listener = tokio::net::TcpListener::bind(&config.server_addr)
         .await

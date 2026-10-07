@@ -34,14 +34,6 @@ pub struct ReportResponse {
     pub description: String,
 }
 
-#[derive(Debug, Serialize, ToSchema)]
-pub struct ErrorResponse {
-    #[schema(example = "404 Not Found")]
-    pub error: String,
-    #[schema(example = "report 550e8400... not found")]
-    pub message: String,
-}
-
 impl From<crate::api::reports::report_entity::Report> for ReportResponse {
     fn from(report: crate::api::reports::report_entity::Report) -> Self {
         Self {

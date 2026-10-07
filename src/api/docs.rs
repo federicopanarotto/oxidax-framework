@@ -2,9 +2,8 @@ use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
 use crate::api::reports::report_controller;
-use crate::api::reports::report_dto::{
-    CreateReportDto, ErrorResponse, ReportResponse, UpdateReportDto,
-};
+use crate::api::reports::report_dto::{CreateReportDto, ReportResponse, UpdateReportDto};
+use crate::errors::ErrorResponse;
 
 #[derive(OpenApi)]
 #[openapi(

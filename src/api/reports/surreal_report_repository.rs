@@ -6,7 +6,7 @@ use surrealdb::types::{RecordId, RecordIdKey, SurrealValue, ToSql};
 
 use crate::api::reports::report_entity::Report;
 use crate::api::reports::report_repository::ReportRepository;
-use crate::error::{AppError, AppResult};
+use crate::errors::{AppError, AppResult};
 
 const TABLE: &str = "report";
 

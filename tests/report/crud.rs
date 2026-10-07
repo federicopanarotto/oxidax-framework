@@ -1,30 +1,11 @@
-use axum::Router;
-use axum::body::{Body, to_bytes};
+//! Ciclo completo CRUD via HTTP e gestione degli errori di validazione.
+
+use axum::body::Body;
 use axum::http::{Request, StatusCode};
-use axum_api::api;
-use axum_api::api::reports::report_service::ReportService;
-use axum_api::db;
-use serde_json::{Value, json};
+use serde_json::json;
 use tower::ServiceExt;
 
-async fn app() -> Router {
-    let repository = db::memory_repository().await.expect("memory repository");
-    api::router(ReportService::new(repository))
-}
-
-async fn json_body(response: axum::response::Response) -> Value {
-    let bytes = to_bytes(response.into_body(), usize::MAX).await.unwrap();
-    serde_json::from_slice(&bytes).unwrap()
-}
-
-fn json_request(method: &str, uri: &str, body: Value) -> Request<Body> {
-    Request::builder()
-        .method(method)
-        .uri(uri)
-        .header("content-type", "application/json")
-        .body(Body::from(body.to_string()))
-        .unwrap()
-}
+use crate::support::{app, json_body, json_request};
 
 #[tokio::test]
 async fn reports_full_crud_cycle() {
@@ -134,37 +115,47 @@ async fn create_without_name_is_rejected() {
 
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     let body = json_body(response).await;
+    assert_eq!(body["code"], "validation_error");
     assert!(body["message"].as_str().unwrap().contains("name"));
 }
 
 #[tokio::test]
-async fn swagger_and_health_are_available() {
+async fn malformed_json_uses_error_pipeline() {
     let app = app().await;
 
     let response = app
-        .clone()
         .oneshot(
             Request::builder()
-                .uri("/health")
-                .body(Body::empty())
+                .method("POST")
+                .uri("/api/reports")
+                .header("content-type", "application/json")
+                .body(Body::from("{non-json"))
                 .unwrap(),
         )
         .await
         .unwrap();
-    assert_eq!(response.status(), StatusCode::OK);
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    let body = json_body(response).await;
+    assert_eq!(body["code"], "validation_error");
+    assert!(body["message"].is_string());
+}
+
+#[tokio::test]
+async fn unknown_route_returns_uniform_error() {
+    let app = app().await;
 
     let response = app
         .oneshot(
             Request::builder()
-                .uri("/api-docs/openapi.json")
+                .uri("/api/inesistente")
                 .body(Body::empty())
                 .unwrap(),
         )
         .await
         .unwrap();
-    assert_eq!(response.status(), StatusCode::OK);
-    let spec = json_body(response).await;
-    let paths = spec["paths"].as_object().unwrap();
-    assert!(paths.contains_key("/api/reports"));
-    assert!(paths.contains_key("/api/reports/{id}"));
+
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    let body = json_body(response).await;
+    assert_eq!(body["code"], "not_found");
 }

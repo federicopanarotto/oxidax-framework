@@ -5,7 +5,7 @@ use uuid::Uuid;
 use crate::api::reports::report_dto::{CreateReportDto, ReportResponse, UpdateReportDto};
 use crate::api::reports::report_entity::Report;
 use crate::api::reports::report_repository::ReportRepository;
-use crate::error::{AppError, AppResult};
+use crate::errors::{AppError, AppResult};
 
 const NAME_MAX_LEN: usize = 200;
 const DESCRIPTION_MAX_LEN: usize = 2000;
@@ -96,40 +96,4 @@ fn validate_description(description: &str) -> AppResult<String> {
         )));
     }
     Ok(description.to_string())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::api::reports::report_dto::CreateReportDto;
-    use crate::error::AppError;
-
-    async fn service() -> ReportService {
-        let repository = crate::db::memory_repository()
-            .await
-            .expect("memory repository");
-        ReportService::new(repository)
-    }
-
-    #[tokio::test]
-    async fn create_rejects_empty_name() {
-        let service = service().await;
-        let err = service
-            .create(CreateReportDto {
-                name: "   ".into(),
-                description: "desc".into(),
-            })
-            .await
-            .unwrap_err();
-
-        assert!(matches!(err, AppError::Validation(_)), "{err:?}");
-    }
-
-    #[tokio::test]
-    async fn get_missing_report_is_not_found() {
-        let service = service().await;
-        let err = service.get("does-not-exist").await.unwrap_err();
-
-        assert!(matches!(err, AppError::NotFound(_)), "{err:?}");
-    }
 }

@@ -1,21 +1,52 @@
+use axum::Json;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
-use axum::routing::{get, post};
-use axum::{Json, Router};
 
-use crate::api::reports::report_dto::{
-    CreateReportDto, ErrorResponse, ReportResponse, UpdateReportDto,
-};
+use crate::api::reports::report_dto::{CreateReportDto, ReportResponse, UpdateReportDto};
 use crate::api::reports::report_service::ReportService;
+use crate::errors::{AppJson, AppResult, ErrorResponse};
 
-pub fn router(service: ReportService) -> Router {
-    Router::new()
-        .route("/", post(create_report).get(list_reports))
-        .route(
-            "/{id}",
-            get(get_report).put(update_report).delete(delete_report),
-        )
-        .with_state(service)
+/// Controller dei report: incapsula il service ed espone gli endpoint.
+///
+/// I metodi contengono la logica HTTP (status code + delega al service);
+/// le funzioni con `#[utoipa::path]` sono i handler axum, sottili wrapper
+/// che estraggono la richiesta e documentano l'endpoint in OpenAPI.
+#[derive(Clone)]
+pub struct ReportController {
+    service: ReportService,
+}
+
+impl ReportController {
+    pub fn new(service: ReportService) -> Self {
+        Self { service }
+    }
+
+    /// Crea un report: 201 con il report appena inserito.
+    pub async fn create(&self, dto: CreateReportDto) -> AppResult<(StatusCode, ReportResponse)> {
+        let created = self.service.create(dto).await?;
+        Ok((StatusCode::CREATED, created))
+    }
+
+    /// Elenca tutti i report.
+    pub async fn list(&self) -> AppResult<Vec<ReportResponse>> {
+        self.service.list().await
+    }
+
+    /// Recupera un report per id.
+    pub async fn get(&self, id: &str) -> AppResult<ReportResponse> {
+        self.service.get(id).await
+    }
+
+    /// Sostituisce un report esistente.
+    pub async fn update(&self, id: &str, dto: UpdateReportDto) -> AppResult<ReportResponse> {
+        self.service.update(id, dto).await
+    }
+
+    /// Elimina un report: 204 senza corpo.
+    pub async fn delete(&self, id: &str) -> AppResult<StatusCode> {
+        self.service.delete(id).await?;
+        Ok(StatusCode::NO_CONTENT)
+    }
 }
 
 #[utoipa::path(
@@ -29,12 +60,12 @@ pub fn router(service: ReportService) -> Router {
         (status = 503, description = "Database unavailable", body = ErrorResponse),
     ),
 )]
-async fn create_report(
-    State(service): State<ReportService>,
-    Json(dto): Json<CreateReportDto>,
-) -> Result<(StatusCode, Json<ReportResponse>), crate::error::AppError> {
-    let created = service.create(dto).await?;
-    Ok((StatusCode::CREATED, Json(created)))
+pub async fn create_report(
+    State(controller): State<ReportController>,
+    AppJson(dto): AppJson<CreateReportDto>,
+) -> AppResult<(StatusCode, Json<ReportResponse>)> {
+    let (status, created) = controller.create(dto).await?;
+    Ok((status, Json(created)))
 }
 
 #[utoipa::path(
@@ -46,10 +77,10 @@ async fn create_report(
         (status = 503, description = "Database unavailable", body = ErrorResponse),
     ),
 )]
-async fn list_reports(
-    State(service): State<ReportService>,
-) -> Result<Json<Vec<ReportResponse>>, crate::error::AppError> {
-    Ok(Json(service.list().await?))
+pub async fn list_reports(
+    State(controller): State<ReportController>,
+) -> AppResult<Json<Vec<ReportResponse>>> {
+    Ok(Json(controller.list().await?))
 }
 
 #[utoipa::path(
@@ -63,11 +94,11 @@ async fn list_reports(
         (status = 503, description = "Database unavailable", body = ErrorResponse),
     ),
 )]
-async fn get_report(
-    State(service): State<ReportService>,
+pub async fn get_report(
+    State(controller): State<ReportController>,
     Path(id): Path<String>,
-) -> Result<Json<ReportResponse>, crate::error::AppError> {
-    Ok(Json(service.get(&id).await?))
+) -> AppResult<Json<ReportResponse>> {
+    Ok(Json(controller.get(&id).await?))
 }
 
 #[utoipa::path(
@@ -83,12 +114,12 @@ async fn get_report(
         (status = 503, description = "Database unavailable", body = ErrorResponse),
     ),
 )]
-async fn update_report(
-    State(service): State<ReportService>,
+pub async fn update_report(
+    State(controller): State<ReportController>,
     Path(id): Path<String>,
-    Json(dto): Json<UpdateReportDto>,
-) -> Result<Json<ReportResponse>, crate::error::AppError> {
-    Ok(Json(service.update(&id, dto).await?))
+    AppJson(dto): AppJson<UpdateReportDto>,
+) -> AppResult<Json<ReportResponse>> {
+    Ok(Json(controller.update(&id, dto).await?))
 }
 
 #[utoipa::path(
@@ -102,10 +133,9 @@ async fn update_report(
         (status = 503, description = "Database unavailable", body = ErrorResponse),
     ),
 )]
-async fn delete_report(
-    State(service): State<ReportService>,
+pub async fn delete_report(
+    State(controller): State<ReportController>,
     Path(id): Path<String>,
-) -> Result<StatusCode, crate::error::AppError> {
-    service.delete(&id).await?;
-    Ok(StatusCode::NO_CONTENT)
+) -> AppResult<StatusCode> {
+    controller.delete(&id).await
 }

@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 
 use crate::api::reports::report_entity::Report;
-use crate::error::AppResult;
+use crate::errors::AppResult;
 
 /// Contratto di persistenza per i report.
 ///

@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use crate::api::reports::report_repository::ReportRepository;
 use crate::config::{Config, DbBackend};
-use crate::error::AppResult;
+use crate::errors::AppResult;
 
 /// Crea il repository dei report in base al backend configurato.
 ///

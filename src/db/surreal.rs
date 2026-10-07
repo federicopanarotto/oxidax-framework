@@ -7,7 +7,7 @@ use surrealdb::opt::auth::Root;
 use crate::api::reports::report_repository::ReportRepository;
 use crate::api::reports::surreal_report_repository::SurrealReportRepository;
 use crate::config::Config;
-use crate::error::{AppError, AppResult};
+use crate::errors::{AppError, AppResult};
 
 pub async fn connect(url: &str, config: &Config) -> AppResult<Arc<dyn ReportRepository>> {
     let db = Surreal::<Any>::init();
