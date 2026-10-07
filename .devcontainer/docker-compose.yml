@@ -9,6 +9,8 @@ services:
       - cargo-git:/usr/local/cargo/git
       - cargo-target:/cargo-target
     command: sleep infinity
+    ports:
+      - "3000:3000"
     environment:
       RUST_LOG: info,axum_api=debug
       SERVER_ADDR: 0.0.0.0:3000

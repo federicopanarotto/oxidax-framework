@@ -6,3 +6,6 @@ RUN apt-get update \
 
 RUN rustup toolchain install stable --profile minimal --component clippy --component rustfmt \
     && rustup default stable
+
+RUN mkdir -p /usr/local/cargo/registry /usr/local/cargo/git /cargo-target \
+    && chown -R vscode:vscode /usr/local/cargo /cargo-target
