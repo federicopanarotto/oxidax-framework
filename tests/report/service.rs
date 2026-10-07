@@ -42,13 +42,18 @@ async fn create_rejects_unknown_category() {
         .create(CreateReportDto {
             name: "Report".into(),
             description: "desc".into(),
-            category_id: Some("missing-category".into()),
+            category_id: Some("00000000-0000-0000-0000-000000000000".into()),
         })
         .await
         .unwrap_err();
 
     match err {
-        AppError::Validation(message) => assert!(message.contains("category"), "{message}"),
+        AppError::Validation(message) => {
+            assert!(
+                message.contains("00000000-0000-0000-0000-000000000000"),
+                "{message}"
+            )
+        }
         other => panic!("atteso errore di validazione, ottenuto {other:?}"),
     }
 }

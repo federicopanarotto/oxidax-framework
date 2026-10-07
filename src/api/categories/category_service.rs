@@ -2,21 +2,18 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use di::injectable;
-use uuid::Uuid;
 
 use crate::api::categories::category_dto::{
     CategoryResponse, CreateCategoryDto, UpdateCategoryDto,
 };
-use crate::api::categories::category_entity::Category;
 use crate::api::categories::category_repository::CategoryRepository;
 use crate::errors::{AppError, AppResult};
 
 /// Regole di business delle categorie.
 ///
-/// La validazione dei campi è demandata all'extractor `ValidatedJson` (decoratori
-/// `#[validate(...)]` sul DTO); qui resta solo la normalizzazione (trim).
-/// `#[injectable]` genera il costruttore con le dipendenze (`Arc<T>`) iniettate
-/// automaticamente dal container.
+/// I DTO arrivano già convertiti e validati (id generato, trim, decoratori
+/// `#[validate(...)]` degli estrattori `ValidatedJson`): il service scrive
+/// soltanto dati pronti nel repository.
 #[injectable]
 pub struct CategoryService {
     repository: Arc<dyn CategoryRepository>,
@@ -24,10 +21,7 @@ pub struct CategoryService {
 
 impl CategoryService {
     pub async fn create(&self, dto: CreateCategoryDto) -> AppResult<CategoryResponse> {
-        let category = Category {
-            id: Uuid::new_v4().to_string(),
-            name: dto.name.trim().to_string(),
-        };
+        let category = dto.into_entity();
 
         self.repository.insert(category).await.map(Into::into)
     }
@@ -48,10 +42,7 @@ impl CategoryService {
     }
 
     pub async fn update(&self, id: &str, dto: UpdateCategoryDto) -> AppResult<CategoryResponse> {
-        let category = Category {
-            id: id.to_string(),
-            name: dto.name.trim().to_string(),
-        };
+        let category = dto.into_entity(id.to_string());
 
         self.repository
             .replace(id, category)

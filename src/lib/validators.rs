@@ -3,6 +3,7 @@
 //! Le funzioni qui sono riutilizzabili in ogni feature via decoratore
 //! `#[validate(custom(function = ...))]` sui campi dei DTO.
 
+use uuid::Uuid;
 use validator::ValidationError;
 
 /// Formatta gli errori di `validator` in una lista di stringhe leggibili nel
@@ -39,4 +40,14 @@ pub fn not_blank(value: &str) -> Result<(), ValidationError> {
     } else {
         Ok(())
     }
+}
+
+/// Usato con `#[validate(custom(function = "crate::lib::validators::validate_uuid"))]`
+/// sui campi id (anche `Option<String>`): controlla che il valore sia un UUID
+/// valido. Su `None` il crate `validator` non esegue il controllo.
+pub fn validate_uuid(value: &str) -> Result<(), ValidationError> {
+    if Uuid::parse_str(value).is_err() {
+        return Err(ValidationError::new("not_a_uuid"));
+    }
+    Ok(())
 }

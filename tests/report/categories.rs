@@ -170,9 +170,7 @@ async fn category_rejects_blank_name() {
     assert_eq!(body["error"], "Errore di validazione del Body");
     let details = body["details"].as_array().expect("details come lista");
     assert!(
-        details
-            .iter()
-            .any(|d| d.as_str().unwrap().contains("name")),
+        details.iter().any(|d| d.as_str().unwrap().contains("name")),
         "{details:?}"
     );
 }
@@ -188,7 +186,7 @@ async fn report_rejects_unknown_category() {
             json!({
                 "name": "Orfano",
                 "description": "Senza categoria valida",
-                "category_id": "does-not-exist",
+                "category_id": "00000000-0000-0000-0000-000000000000",
             }),
         ))
         .await
@@ -197,7 +195,12 @@ async fn report_rejects_unknown_category() {
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     let body = json_body(response).await;
     assert_eq!(body["code"], "validation_error");
-    assert!(body["message"].as_str().unwrap().contains("does-not-exist"));
+    assert!(
+        body["message"]
+            .as_str()
+            .unwrap()
+            .contains("00000000-0000-0000-0000-000000000000")
+    );
 }
 
 #[tokio::test]

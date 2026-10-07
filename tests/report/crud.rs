@@ -120,9 +120,7 @@ async fn create_without_name_returns_422() {
     assert_eq!(body["error"], "Errore di validazione del Body");
     let details = body["details"].as_array().expect("details come lista");
     assert!(
-        details
-            .iter()
-            .any(|d| d.as_str().unwrap().contains("name")),
+        details.iter().any(|d| d.as_str().unwrap().contains("name")),
         "{details:?}"
     );
 }

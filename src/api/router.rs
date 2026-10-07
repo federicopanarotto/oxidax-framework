@@ -13,8 +13,6 @@ use crate::errors::{AppResult, pipeline};
 pub async fn build(config: &Config) -> AppResult<Router> {
     let features = features::build_features(config).await?;
 
-    docs::export_spec();
-
     let mut router = Router::new().nest("/api", api_router(features));
     router = router.merge(docs::swagger_router());
     Ok(router.fallback(pipeline::route_not_found))

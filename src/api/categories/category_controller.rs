@@ -1,12 +1,14 @@
 use std::sync::Arc;
 
 use axum::Json;
+use axum::Router;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::routing::{get, post};
-use axum::Router;
 
-use crate::api::categories::category_dto::{CategoryResponse, CreateCategoryDto, UpdateCategoryDto};
+use crate::api::categories::category_dto::{
+    CategoryResponse, CreateCategoryDto, UpdateCategoryDto,
+};
 use crate::api::categories::category_service::CategoryService;
 use crate::errors::{AppResult, BadRequestResponse, ErrorResponse};
 use crate::lib::{ValidatedJson, ValidationErrorResponse};

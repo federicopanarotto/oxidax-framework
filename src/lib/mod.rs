@@ -10,5 +10,5 @@ pub mod validators;
 pub use middlewares::validation_middleware::{
     ValidatedJson, ValidatedParams, ValidatedQuery, ValidationErrorResponse,
 };
-pub use validators::{format_validation_errors, not_blank};
 pub use validator::Validate;
+pub use validators::{format_validation_errors, not_blank};

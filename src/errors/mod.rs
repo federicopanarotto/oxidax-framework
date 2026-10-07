@@ -32,7 +32,6 @@ impl PartialSchema for BadRequestResponse {
         OneOfBuilder::new()
             .item(Ref::from_schema_name("ErrorResponse"))
             .item(Ref::from_schema_name("ValidationErrorResponse"))
-            .build()
             .into()
     }
 }

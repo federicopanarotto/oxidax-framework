@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use di::injectable;
-use uuid::Uuid;
 
 use crate::api::categories::category_dto::CategoryResponse;
 use crate::api::categories::category_service::CategoryService;
@@ -12,10 +11,10 @@ use crate::errors::{AppError, AppResult};
 
 /// Regole di business dei report.
 ///
-/// La validazione dei campi (nome/descrizione) è demandata agli estrattori
-/// `ValidatedJson`/`ValidatedQuery`/`ValidatedParams` (con decoratori
-/// `#[validate(...)]` sui DTO); qui resta solo la normalizzazione (trim) e la
-/// validazione di dominio che richiede il database (esistenza della categoria).
+/// I DTO arrivano già convertiti e validati (id generato, trim, formato UUID
+/// verificato dagli estrattori `ValidatedJson`): qui il service si limita a
+/// scrivere dati pronti nel repository. Resta solo la validazione di dominio
+/// che richiede il database (esistenza della categoria).
 #[injectable]
 pub struct ReportService {
     repository: Arc<dyn ReportRepository>,
@@ -24,12 +23,8 @@ pub struct ReportService {
 
 impl ReportService {
     pub async fn create(&self, dto: CreateReportDto) -> AppResult<ReportResponse> {
-        let report = Report {
-            id: Uuid::new_v4().to_string(),
-            name: dto.name.trim().to_string(),
-            description: dto.description.trim().to_string(),
-            category_id: self.validate_category_id(dto.category_id).await?,
-        };
+        let report = dto.into_entity();
+        self.validate_category_id(&report.category_id).await?;
 
         let report = self.repository.insert(report).await?;
         self.decorate(report).await
@@ -61,12 +56,8 @@ impl ReportService {
     }
 
     pub async fn update(&self, id: &str, dto: UpdateReportDto) -> AppResult<ReportResponse> {
-        let report = Report {
-            id: id.to_string(),
-            name: dto.name.trim().to_string(),
-            description: dto.description.trim().to_string(),
-            category_id: self.validate_category_id(dto.category_id).await?,
-        };
+        let report = dto.into_entity(id.to_string());
+        self.validate_category_id(&report.category_id).await?;
 
         let report = self
             .repository
@@ -86,24 +77,16 @@ impl ReportService {
 
     /// Valida la relazione con le categorie.
     ///
-    /// Un `category_id` vuoto o assente normalizza a `None`; se presente deve
-    /// riferire a una categoria esistente, altrimenti l'errore è una
-    /// `validation_error` (400) perché il campo non passa la validazione.
-    async fn validate_category_id(&self, category_id: Option<String>) -> AppResult<Option<String>> {
-        let Some(category_id) = category_id
-            .map(|value| value.trim().to_string())
-            .filter(|value| !value.is_empty())
-        else {
-            return Ok(None);
-        };
-
-        if !self.categories.exists(&category_id).await? {
-            return Err(AppError::Validation(format!(
-                "category {category_id} not found"
-            )));
+    /// Il formato dell'id è già stato verificato a livello di DTO; qui si
+    /// controlla solo l'esistenza della categoria nel database. Se il campo è
+    /// assente (`None`) non c'è nulla da verificare.
+    async fn validate_category_id(&self, category_id: &Option<String>) -> AppResult<()> {
+        if let Some(id) = category_id
+            && !self.categories.exists(id).await?
+        {
+            return Err(AppError::Validation(format!("category {id} not found")));
         }
-
-        Ok(Some(category_id))
+        Ok(())
     }
 
     /// Compone la response annidando l'oggetto `category` (se la relazione esiste).

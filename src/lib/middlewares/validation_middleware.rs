@@ -46,15 +46,13 @@ where
     type Rejection = Response;
 
     async fn from_request(req: Request, state: &S) -> Result<Self, Self::Rejection> {
-        let Json(data) = Json::<T>::from_request(req, state)
-            .await
-            .map_err(|err| {
-                error_response(
-                    StatusCode::BAD_REQUEST,
-                    "Body JSON non valido o malformato",
-                    vec![err.to_string()],
-                )
-            })?;
+        let Json(data) = Json::<T>::from_request(req, state).await.map_err(|err| {
+            error_response(
+                StatusCode::BAD_REQUEST,
+                "Body JSON non valido o malformato",
+                vec![err.to_string()],
+            )
+        })?;
 
         if let Err(errors) = data.validate() {
             return Err(validation_error_response("Body", errors));
@@ -125,5 +123,12 @@ fn validation_error_response(source: &str, errors: validator::ValidationErrors) 
 }
 
 fn error_response(status: StatusCode, error: impl Into<String>, details: Vec<String>) -> Response {
-    (status, Json(ValidationErrorResponse { error: error.into(), details })).into_response()
+    (
+        status,
+        Json(ValidationErrorResponse {
+            error: error.into(),
+            details,
+        }),
+    )
+        .into_response()
 }

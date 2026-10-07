@@ -1,5 +1,3 @@
-use std::fs;
-
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
@@ -11,39 +9,6 @@ use crate::api::reports::report_controller;
 use crate::api::reports::report_dto::{CreateReportDto, ReportResponse, UpdateReportDto};
 use crate::errors::{BadRequestResponse, ErrorResponse};
 use crate::lib::ValidationErrorResponse;
-
-/// Percorso del file OpenAPI esportato a ogni avvio del server.
-const OPENAPI_PATH: &str = "docs/openapi.json";
-
-/// Esporta la specifica OpenAPI su file: la documentazione resta allineata al
-/// codice a ogni `cargo run` (e a ogni esecuzione dei test).
-///
-/// È best-effort: se la scrittura fallisce il server parte comunque.
-pub fn export_spec() {
-    if let Err(err) = fs::create_dir_all("docs") {
-        tracing::warn!(?err, "impossibile creare la cartella della documentazione");
-        return;
-    }
-
-    let spec = match serde_json::to_string_pretty(&ApiDoc::openapi()) {
-        Ok(spec) => spec,
-        Err(err) => {
-            tracing::warn!(?err, "impossibile serializzare la specifica OpenAPI");
-            return;
-        }
-    };
-
-    match fs::write(OPENAPI_PATH, spec) {
-        Ok(()) => tracing::info!(path = OPENAPI_PATH, "documentazione OpenAPI esportata"),
-        Err(err) => {
-            tracing::warn!(
-                ?err,
-                path = OPENAPI_PATH,
-                "impossibile esportare la specifica OpenAPI"
-            )
-        }
-    }
-}
 
 #[derive(OpenApi)]
 #[openapi(
@@ -82,6 +47,8 @@ pub fn export_spec() {
 )]
 pub struct ApiDoc;
 
+/// Documentazione live servita dalla UI Swagger: la specifica OpenAPI è
+/// generata a runtime da `ApiDoc` senza scrivere alcun file su disco.
 pub fn swagger_router() -> SwaggerUi {
     SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi())
 }

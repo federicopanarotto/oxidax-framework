@@ -11,10 +11,10 @@ use std::sync::Arc;
 use axum::Router;
 use di::{Injectable, ServiceCollection, ServiceProvider, singleton_factory};
 
-use crate::api::categories::category_controller::CategoryController;
+use crate::api::categories::category_controller;
 use crate::api::categories::category_repository::CategoryRepository;
 use crate::api::categories::category_service::CategoryService;
-use crate::api::reports::report_controller::ReportController;
+use crate::api::reports::report_controller;
 use crate::api::reports::report_repository::ReportRepository;
 use crate::api::reports::report_service::ReportService;
 use crate::config::Config;
@@ -42,22 +42,24 @@ pub async fn provider(config: &Config) -> AppResult<ServiceProvider> {
             move |_| -> di::Ref<dyn CategoryRepository> { categories.clone() },
         ))
         .add(CategoryService::singleton())
-        .add(ReportService::singleton())
-        .add(CategoryController::singleton())
-        .add(ReportController::singleton());
+        .add(ReportService::singleton());
 
     services.build_provider().map_err(di_error)
 }
 
-/// Risolve i controller dal provider DI e chiede a ciascuno la propria tabella
-/// delle rotte (incapsulata nella classe), già montata con lo stato.
+/// Risolve i service dal provider DI e costruisce le tabelle delle rotte,
+/// passando a ciascuna il proprio service come stato (niente controller
+/// oggetto: gli handler usano direttamente il service).
 pub async fn build_features(config: &Config) -> AppResult<Vec<Router<()>>> {
     let provider = provider(config).await?;
 
-    let reports = provider.get_required::<ReportController>();
-    let categories = provider.get_required::<CategoryController>();
+    let reports = provider.get_required::<ReportService>();
+    let categories = provider.get_required::<CategoryService>();
 
-    Ok(vec![(*reports).clone().router(), (*categories).clone().router()])
+    Ok(vec![
+        report_controller::router(reports),
+        category_controller::router(categories),
+    ])
 }
 
 fn di_error(err: impl std::fmt::Display) -> AppError {
