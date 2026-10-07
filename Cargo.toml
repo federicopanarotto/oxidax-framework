@@ -16,6 +16,8 @@ async-trait = "0.1"
 thiserror = "2"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+more-di = { version = "3", features = ["async"] }
+validator = { version = "0.20", features = ["derive"] }
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }

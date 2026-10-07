@@ -1,27 +1,30 @@
-//! Regole di business del service (validazione e 404), senza passare dal
-//! livello HTTP.
+//! Regole di business del service (normalizzazione dei campi e 404), senza
+//! passare dal livello HTTP.
+
+use std::sync::Arc;
 
 use axum_api::api::reports::report_dto::CreateReportDto;
 use axum_api::api::reports::report_service::ReportService;
 use axum_api::errors::AppError;
 
-async fn service() -> ReportService {
+async fn service() -> Arc<ReportService> {
     crate::support::report_service().await
 }
 
 #[tokio::test]
-async fn create_rejects_empty_name() {
+async fn create_trims_name_and_description() {
     let service = service().await;
-    let err = service
+    let created = service
         .create(CreateReportDto {
-            name: "   ".into(),
-            description: "desc".into(),
+            name: "  Vendite mensili  ".into(),
+            description: "  Report di prova  ".into(),
             category_id: None,
         })
         .await
-        .unwrap_err();
+        .expect("report creato");
 
-    assert!(matches!(err, AppError::Validation(_)), "{err:?}");
+    assert_eq!(created.name, "Vendite mensili");
+    assert_eq!(created.description, "Report di prova");
 }
 
 #[tokio::test]

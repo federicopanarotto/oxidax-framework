@@ -14,7 +14,7 @@ async fn swagger_and_health_are_available() {
         .clone()
         .oneshot(
             Request::builder()
-                .uri("/health")
+                .uri("/api/health")
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -55,4 +55,36 @@ async fn swagger_and_health_are_available() {
     assert!(schemas.contains_key("ErrorResponse"));
     assert!(schemas.contains_key("ReportResponse"));
     assert!(schemas.contains_key("CategoryResponse"));
+    assert!(schemas.contains_key("ValidationErrorResponse"));
+
+    let create_report = &spec["paths"]["/api/reports"]["post"];
+    assert!(
+        create_report["responses"]["422"].is_object(),
+        "risposta 422 documentata per la creazione dei report"
+    );
+    assert_eq!(
+        create_report["responses"]["422"]["content"]["application/json"]["schema"]["$ref"],
+        "#/components/schemas/ValidationErrorResponse"
+    );
+}
+
+#[tokio::test]
+async fn openapi_spec_is_exported_on_startup() {
+    let _app = app().await;
+
+    let file = std::fs::read_to_string("docs/openapi.json").expect("openapi.json esportato");
+    let spec: serde_json::Value = serde_json::from_str(&file).unwrap();
+    assert!(spec["openapi"].is_string());
+    assert!(
+        spec["paths"]
+            .as_object()
+            .unwrap()
+            .contains_key("/api/reports")
+    );
+    assert!(
+        spec["paths"]
+            .as_object()
+            .unwrap()
+            .contains_key("/api/categories")
+    );
 }

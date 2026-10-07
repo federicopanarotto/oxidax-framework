@@ -1,17 +1,33 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+use crate::lib::Validate;
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Validate)]
 pub struct CreateCategoryDto {
     /// Nome della categoria
-    #[schema(example = "Vendite")]
+    #[schema(example = "Vendite", min_length = 1, max_length = 200)]
+    #[validate(
+        custom(
+            function = "crate::lib::validators::not_blank",
+            message = "Il nome è obbligatorio e non può essere vuoto"
+        ),
+        length(max = 200, message = "Il nome deve essere di massimo 200 caratteri"),
+    )]
     pub name: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Validate)]
 pub struct UpdateCategoryDto {
     /// Nuovo nome della categoria
-    #[schema(example = "Marketing")]
+    #[schema(example = "Marketing", min_length = 1, max_length = 200)]
+    #[validate(
+        custom(
+            function = "crate::lib::validators::not_blank",
+            message = "Il nome è obbligatorio e non può essere vuoto"
+        ),
+        length(max = 200, message = "Il nome deve essere di massimo 200 caratteri"),
+    )]
     pub name: String,
 }
 

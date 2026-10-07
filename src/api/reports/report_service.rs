@@ -1,77 +1,79 @@
 use std::sync::Arc;
 
+use di::injectable;
 use uuid::Uuid;
 
+use crate::api::categories::category_dto::CategoryResponse;
 use crate::api::categories::category_service::CategoryService;
 use crate::api::reports::report_dto::{CreateReportDto, ReportResponse, UpdateReportDto};
 use crate::api::reports::report_entity::Report;
 use crate::api::reports::report_repository::ReportRepository;
 use crate::errors::{AppError, AppResult};
 
-const NAME_MAX_LEN: usize = 200;
-const DESCRIPTION_MAX_LEN: usize = 2000;
-
-#[derive(Clone)]
+/// Regole di business dei report.
+///
+/// La validazione dei campi (nome/descrizione) è demandata agli estrattori
+/// `ValidatedJson`/`ValidatedQuery`/`ValidatedParams` (con decoratori
+/// `#[validate(...)]` sui DTO); qui resta solo la normalizzazione (trim) e la
+/// validazione di dominio che richiede il database (esistenza della categoria).
+#[injectable]
 pub struct ReportService {
     repository: Arc<dyn ReportRepository>,
-    categories: CategoryService,
+    categories: Arc<CategoryService>,
 }
 
 impl ReportService {
-    pub fn new(repository: Arc<dyn ReportRepository>, categories: CategoryService) -> Self {
-        Self {
-            repository,
-            categories,
-        }
-    }
-
     pub async fn create(&self, dto: CreateReportDto) -> AppResult<ReportResponse> {
-        let name = validate_name(&dto.name)?;
-        let description = validate_description(&dto.description)?;
-        let category_id = self.validate_category_id(dto.category_id).await?;
-
         let report = Report {
             id: Uuid::new_v4().to_string(),
-            name,
-            description,
-            category_id,
+            name: dto.name.trim().to_string(),
+            description: dto.description.trim().to_string(),
+            category_id: self.validate_category_id(dto.category_id).await?,
         };
 
-        self.repository.insert(report).await.map(Into::into)
+        let report = self.repository.insert(report).await?;
+        self.decorate(report).await
     }
 
     pub async fn get(&self, id: &str) -> AppResult<ReportResponse> {
-        self.repository
+        let report = self
+            .repository
             .find_by_id(id)
             .await?
-            .map(Into::into)
-            .ok_or_else(|| not_found(id))
+            .ok_or_else(|| not_found(id))?;
+        self.decorate(report).await
     }
 
     pub async fn list(&self) -> AppResult<Vec<ReportResponse>> {
-        self.repository
-            .find_all()
-            .await
-            .map(|reports| reports.into_iter().map(Into::into).collect())
+        let reports = self.repository.find_all().await?;
+        let categories = self.categories.by_id().await?;
+
+        Ok(reports
+            .into_iter()
+            .map(|report| {
+                let category = report
+                    .category_id
+                    .as_ref()
+                    .and_then(|id| categories.get(id).cloned());
+                (report, category).into()
+            })
+            .collect())
     }
 
     pub async fn update(&self, id: &str, dto: UpdateReportDto) -> AppResult<ReportResponse> {
-        let name = validate_name(&dto.name)?;
-        let description = validate_description(&dto.description)?;
-        let category_id = self.validate_category_id(dto.category_id).await?;
-
         let report = Report {
             id: id.to_string(),
-            name,
-            description,
-            category_id,
+            name: dto.name.trim().to_string(),
+            description: dto.description.trim().to_string(),
+            category_id: self.validate_category_id(dto.category_id).await?,
         };
 
-        self.repository
+        let report = self
+            .repository
             .replace(id, report)
             .await?
-            .map(Into::into)
-            .ok_or_else(|| not_found(id))
+            .ok_or_else(|| not_found(id))?;
+        self.decorate(report).await
     }
 
     pub async fn delete(&self, id: &str) -> AppResult<()> {
@@ -103,34 +105,21 @@ impl ReportService {
 
         Ok(Some(category_id))
     }
+
+    /// Compone la response annidando l'oggetto `category` (se la relazione esiste).
+    async fn decorate(&self, report: Report) -> AppResult<ReportResponse> {
+        let category = self.category_of(&report).await?;
+        Ok((report, category).into())
+    }
+
+    async fn category_of(&self, report: &Report) -> AppResult<Option<CategoryResponse>> {
+        match &report.category_id {
+            Some(category_id) => self.categories.find(category_id).await,
+            None => Ok(None),
+        }
+    }
 }
 
 fn not_found(id: &str) -> AppError {
     AppError::NotFound(format!("report {id} not found"))
-}
-
-fn validate_name(name: &str) -> AppResult<String> {
-    let name = name.trim();
-    if name.is_empty() {
-        return Err(AppError::Validation("name must not be empty".into()));
-    }
-    if name.chars().count() > NAME_MAX_LEN {
-        return Err(AppError::Validation(format!(
-            "name must be at most {NAME_MAX_LEN} characters"
-        )));
-    }
-    Ok(name.to_string())
-}
-
-fn validate_description(description: &str) -> AppResult<String> {
-    let description = description.trim();
-    if description.is_empty() {
-        return Err(AppError::Validation("description must not be empty".into()));
-    }
-    if description.chars().count() > DESCRIPTION_MAX_LEN {
-        return Err(AppError::Validation(format!(
-            "description must be at most {DESCRIPTION_MAX_LEN} characters"
-        )));
-    }
-    Ok(description.to_string())
 }

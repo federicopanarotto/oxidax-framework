@@ -131,6 +131,8 @@ async fn report_accepts_existing_category() {
     let created = json_body(response).await;
     assert_eq!(status, StatusCode::CREATED, "{created}");
     assert_eq!(created["category_id"], category_id.as_str());
+    assert_eq!(created["category"]["id"], category_id.as_str());
+    assert_eq!(created["category"]["name"], "Finanza");
 
     let report_id = created["id"].as_str().expect("id report").to_string();
 
@@ -146,6 +148,33 @@ async fn report_accepts_existing_category() {
         .unwrap();
     let fetched = json_body(response).await;
     assert_eq!(fetched["category_id"], category_id.as_str());
+    assert_eq!(fetched["category"]["id"], category_id.as_str());
+    assert_eq!(fetched["category"]["name"], "Finanza");
+}
+
+#[tokio::test]
+async fn category_rejects_blank_name() {
+    let app = app().await;
+
+    let response = app
+        .oneshot(json_request(
+            "POST",
+            "/api/categories",
+            json!({"name": "   "}),
+        ))
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let body = json_body(response).await;
+    assert_eq!(body["error"], "Errore di validazione del Body");
+    let details = body["details"].as_array().expect("details come lista");
+    assert!(
+        details
+            .iter()
+            .any(|d| d.as_str().unwrap().contains("name")),
+        "{details:?}"
+    );
 }
 
 #[tokio::test]
@@ -221,4 +250,5 @@ async fn update_can_remove_category() {
     let updated = json_body(response).await;
     assert_eq!(status, StatusCode::OK, "{updated}");
     assert!(updated["category_id"].is_null(), "{updated}");
+    assert!(updated["category"].is_null(), "{updated}");
 }

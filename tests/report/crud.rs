@@ -25,6 +25,8 @@ async fn reports_full_crud_cycle() {
     assert_eq!(status, StatusCode::CREATED, "{created}");
     let id = created["id"].as_str().expect("id presente").to_string();
     assert_eq!(created["name"], "Vendite mensili");
+    assert!(created["category_id"].is_null(), "{created}");
+    assert!(created["category"].is_null(), "{created}");
 
     let response = app
         .clone()
@@ -101,7 +103,7 @@ async fn reports_full_crud_cycle() {
 }
 
 #[tokio::test]
-async fn create_without_name_is_rejected() {
+async fn create_without_name_returns_422() {
     let app = app().await;
 
     let response = app
@@ -113,14 +115,20 @@ async fn create_without_name_is_rejected() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
     let body = json_body(response).await;
-    assert_eq!(body["code"], "validation_error");
-    assert!(body["message"].as_str().unwrap().contains("name"));
+    assert_eq!(body["error"], "Errore di validazione del Body");
+    let details = body["details"].as_array().expect("details come lista");
+    assert!(
+        details
+            .iter()
+            .any(|d| d.as_str().unwrap().contains("name")),
+        "{details:?}"
+    );
 }
 
 #[tokio::test]
-async fn malformed_json_uses_error_pipeline() {
+async fn malformed_json_returns_400_with_details() {
     let app = app().await;
 
     let response = app
@@ -137,8 +145,9 @@ async fn malformed_json_uses_error_pipeline() {
 
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     let body = json_body(response).await;
-    assert_eq!(body["code"], "validation_error");
-    assert!(body["message"].is_string());
+    assert_eq!(body["error"], "Body JSON non valido o malformato");
+    let details = body["details"].as_array().expect("details come lista");
+    assert!(!details.is_empty());
 }
 
 #[tokio::test]

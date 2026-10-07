@@ -1,36 +1,33 @@
 use axum::Router;
 use axum::routing::get;
 
-use crate::api::categories::category_controller::CategoryController;
-use crate::api::categories::category_router;
-use crate::api::categories::category_service::CategoryService;
 use crate::api::docs;
-use crate::api::reports::report_controller::ReportController;
-use crate::api::reports::report_router;
-use crate::api::reports::report_service::ReportService;
+use crate::api::features;
 use crate::config::Config;
-use crate::db;
 use crate::errors::{AppResult, pipeline};
 
-/// Punto di composizione dell'applicazione: il router generale dell'API.
+/// Router generale dell'API.
 ///
-/// Configura tutto in sequenza — database → service → controller → rotte — e
-/// restituisce l'`Router` pronto da servire. `main` non conosce i controller
-/// né i repository: chiama solo questa funzione.
+/// Non conosce le classi delle feature: riceve dal container DI i sotto-router
+/// già costruiti e li aggrega sotto `/api`. `main` chiama solo `build`.
 pub async fn build(config: &Config) -> AppResult<Router> {
-    let repositories = db::repositories(config).await?;
+    let features = features::build_features(config).await?;
 
-    let categories = CategoryService::new(repositories.categories);
-    let category_controller = CategoryController::new(categories.clone());
-    let reports = ReportService::new(repositories.reports, categories);
-    let report_controller = ReportController::new(reports);
+    docs::export_spec();
 
-    Ok(Router::new()
-        .route("/health", get(health))
-        .nest("/api/reports", report_router::router(report_controller))
-        .nest("/api/categories", category_router::router(category_controller))
-        .merge(docs::swagger_router())
-        .fallback(pipeline::route_not_found))
+    let mut router = Router::new().nest("/api", api_router(features));
+    router = router.merge(docs::swagger_router());
+    Ok(router.fallback(pipeline::route_not_found))
+}
+
+/// Aggrega i sotto-router delle feature sotto `/api`: ogni feature registra le
+/// proprie rotte relative (es. `/reports`, `/categories`).
+fn api_router(features: Vec<Router<()>>) -> Router {
+    let mut router = Router::new().route("/health", get(health));
+    for feature in features {
+        router = router.merge(feature);
+    }
+    router
 }
 
 async fn health() -> &'static str {

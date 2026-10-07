@@ -1,5 +1,7 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
+use di::injectable;
 use uuid::Uuid;
 
 use crate::api::categories::category_dto::{
@@ -9,27 +11,22 @@ use crate::api::categories::category_entity::Category;
 use crate::api::categories::category_repository::CategoryRepository;
 use crate::errors::{AppError, AppResult};
 
-const NAME_MAX_LEN: usize = 200;
-
 /// Regole di business delle categorie.
 ///
-/// Il campo `repository` è `Arc`: il service è `Clone` e può essere condiviso
-/// fra il controller delle category e quello dei report (che ne valida
-/// l'esistenza per la relazione `Report.category_id`).
-#[derive(Clone)]
+/// La validazione dei campi è demandata all'extractor `ValidatedJson` (decoratori
+/// `#[validate(...)]` sul DTO); qui resta solo la normalizzazione (trim).
+/// `#[injectable]` genera il costruttore con le dipendenze (`Arc<T>`) iniettate
+/// automaticamente dal container.
+#[injectable]
 pub struct CategoryService {
     repository: Arc<dyn CategoryRepository>,
 }
 
 impl CategoryService {
-    pub fn new(repository: Arc<dyn CategoryRepository>) -> Self {
-        Self { repository }
-    }
-
     pub async fn create(&self, dto: CreateCategoryDto) -> AppResult<CategoryResponse> {
         let category = Category {
             id: Uuid::new_v4().to_string(),
-            name: validate_name(&dto.name)?,
+            name: dto.name.trim().to_string(),
         };
 
         self.repository.insert(category).await.map(Into::into)
@@ -53,7 +50,7 @@ impl CategoryService {
     pub async fn update(&self, id: &str, dto: UpdateCategoryDto) -> AppResult<CategoryResponse> {
         let category = Category {
             id: id.to_string(),
-            name: validate_name(&dto.name)?,
+            name: dto.name.trim().to_string(),
         };
 
         self.repository
@@ -76,21 +73,24 @@ impl CategoryService {
     pub async fn exists(&self, id: &str) -> AppResult<bool> {
         Ok(self.repository.find_by_id(id).await?.is_some())
     }
+
+    /// Recupera una categoria senza fallire se assente: usata dal service dei
+    /// report per annidare l'oggetto `category` nella response.
+    pub async fn find(&self, id: &str) -> AppResult<Option<CategoryResponse>> {
+        Ok(self.repository.find_by_id(id).await?.map(Into::into))
+    }
+
+    /// Indice `id → categoria`: decora una lista di report con una sola lettura
+    /// evitando N+1 query per ogni elemento.
+    pub async fn by_id(&self) -> AppResult<HashMap<String, CategoryResponse>> {
+        let mut index = HashMap::new();
+        for category in self.list().await? {
+            index.insert(category.id.clone(), category);
+        }
+        Ok(index)
+    }
 }
 
 fn not_found(id: &str) -> AppError {
     AppError::NotFound(format!("category {id} not found"))
-}
-
-fn validate_name(name: &str) -> AppResult<String> {
-    let name = name.trim();
-    if name.is_empty() {
-        return Err(AppError::Validation("name must not be empty".into()));
-    }
-    if name.chars().count() > NAME_MAX_LEN {
-        return Err(AppError::Validation(format!(
-            "name must be at most {NAME_MAX_LEN} characters"
-        )));
-    }
-    Ok(name.to_string())
 }
