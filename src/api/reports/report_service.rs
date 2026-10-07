@@ -88,9 +88,7 @@ fn validate_name(name: &str) -> AppResult<String> {
 fn validate_description(description: &str) -> AppResult<String> {
     let description = description.trim();
     if description.is_empty() {
-        return Err(AppError::Validation(
-            "description must not be empty".into(),
-        ));
+        return Err(AppError::Validation("description must not be empty".into()));
     }
     if description.chars().count() > DESCRIPTION_MAX_LEN {
         return Err(AppError::Validation(format!(

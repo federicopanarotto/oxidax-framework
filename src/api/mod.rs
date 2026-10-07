@@ -1,8 +1,8 @@
 pub mod docs;
 pub mod reports;
 
-use axum::routing::get;
 use axum::Router;
+use axum::routing::get;
 
 use crate::api::reports::report_service::ReportService;
 

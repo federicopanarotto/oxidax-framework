@@ -1,10 +1,10 @@
-use axum::body::{to_bytes, Body};
-use axum::http::{Request, StatusCode};
 use axum::Router;
+use axum::body::{Body, to_bytes};
+use axum::http::{Request, StatusCode};
 use axum_api::api;
 use axum_api::api::reports::report_service::ReportService;
 use axum_api::db;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tower::ServiceExt;
 
 async fn app() -> Router {

@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
+use surrealdb::Surreal;
 use surrealdb::engine::any::Any;
 use surrealdb::types::{RecordId, RecordIdKey, SurrealValue, ToSql};
-use surrealdb::Surreal;
 
 use crate::api::reports::report_entity::Report;
 use crate::api::reports::report_repository::ReportRepository;
