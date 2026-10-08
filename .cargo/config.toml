@@ -1,0 +1,3 @@
+[alias]
+dev = "watch --poll -x run"
+dev-check = "watch --poll -x check"

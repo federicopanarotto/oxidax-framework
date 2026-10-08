@@ -199,6 +199,34 @@ DB_BACKEND=memory cargo run
 cargo run
 ```
 
+### Auto-reload in sviluppo (equivalente di nodemon)
+
+`cargo-watch` è l'equivalente Rust di `nodemon`: ricompila e riavvia il processo
+a ogni salvataggio. È già installato nell'immagine del dev container e ci sono
+due alias pronti in `.cargo/config.toml`:
+
+```bash
+cargo dev          # = cargo watch --poll -x run   (ricompila e riavvia il server)
+cargo dev-check    # = cargo watch --poll -x check (solo controllo, niente restart)
+```
+
+oppure l'invocazione esplicita:
+
+```bash
+cargo watch --poll -x run                 # con il .env (SurrealDB)
+DB_BACKEND=memory cargo watch --poll -x run
+```
+
+`cargo watch` osserva `src/`, `framework-macros/`, i test, `Cargo.toml` e il
+resto del progetto, ignorando `target/`.
+
+> **Perché `--poll`?** Con il mount `..:/workspace:cached` del dev container gli
+> eventi **inotify** generati dalle modifiche fatte *dall'host* (VS Code su
+> Windows) non arrivano al watcher dentro il container: senza `--poll` il
+> processo vedrebbe solo la modifica iniziale e mai i salvataggi successivi.
+> `--poll` fa controllare i file ogni 500 ms e funziona sempre. È un velo più
+> "pesante" (I/O) ma trascurabile per un progetto di questa dimensione.
+
 ## Test
 
 ```bash
