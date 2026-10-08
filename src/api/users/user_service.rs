@@ -38,6 +38,28 @@ impl UserService {
         Ok(UserResponse::new(user, email))
     }
 
+    /// Profile of a user without the email (email is only ever exposed to
+    /// the owner and to admins): used by other services to nest a user in
+    /// their responses without failing if the user is gone.
+    pub async fn find(&self, id: &str) -> AppResult<Option<UserResponse>> {
+        Ok(self
+            .users
+            .find_by_id(id)
+            .await?
+            .map(|user| UserResponse::new(user, None)))
+    }
+
+    /// `id → user` index: decorates a list of entities with a single read,
+    /// avoiding N+1 queries per element.
+    pub async fn by_id(&self) -> AppResult<HashMap<String, UserResponse>> {
+        let mut index = HashMap::new();
+        for user in self.users.find_all().await? {
+            let response = UserResponse::new(user, None);
+            index.insert(response.id.clone(), response);
+        }
+        Ok(index)
+    }
+
     /// All users with their local email, resolved through a single read of
     /// the identities (index instead of N+1 queries).
     pub async fn list(&self) -> AppResult<Vec<UserResponse>> {

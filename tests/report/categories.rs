@@ -5,7 +5,7 @@ use axum::http::{Request, StatusCode};
 use serde_json::json;
 use tower::ServiceExt;
 
-use crate::support::{app, json_body, json_request};
+use crate::support::{app, authorized_json_request, json_body, json_request, mint_access_token};
 
 #[tokio::test]
 async fn categories_full_crud_cycle() {
@@ -114,9 +114,10 @@ async fn report_accepts_existing_category() {
     let category = json_body(response).await;
     let category_id = category["id"].as_str().expect("id categoria").to_string();
 
+    let token = mint_access_token("550e8400-e29b-41d4-a716-446655440000").await;
     let response = app
         .clone()
-        .oneshot(json_request(
+        .oneshot(authorized_json_request(
             "POST",
             "/api/reports",
             json!({
@@ -124,6 +125,7 @@ async fn report_accepts_existing_category() {
                 "description": "Report di prova",
                 "category_id": category_id,
             }),
+            &token,
         ))
         .await
         .unwrap();
@@ -178,9 +180,10 @@ async fn category_rejects_blank_name() {
 #[tokio::test]
 async fn report_rejects_unknown_category() {
     let app = app().await;
+    let token = mint_access_token("550e8400-e29b-41d4-a716-446655440000").await;
 
     let response = app
-        .oneshot(json_request(
+        .oneshot(authorized_json_request(
             "POST",
             "/api/reports",
             json!({
@@ -188,6 +191,7 @@ async fn report_rejects_unknown_category() {
                 "description": "Senza categoria valida",
                 "category_id": "00000000-0000-0000-0000-000000000000",
             }),
+            &token,
         ))
         .await
         .unwrap();
@@ -219,9 +223,10 @@ async fn update_can_remove_category() {
     let category = json_body(response).await;
     let category_id = category["id"].as_str().unwrap().to_string();
 
+    let token = mint_access_token("550e8400-e29b-41d4-a716-446655440000").await;
     let response = app
         .clone()
-        .oneshot(json_request(
+        .oneshot(authorized_json_request(
             "POST",
             "/api/reports",
             json!({
@@ -229,6 +234,7 @@ async fn update_can_remove_category() {
                 "description": "desc",
                 "category_id": category_id,
             }),
+            &token,
         ))
         .await
         .unwrap();

@@ -5,6 +5,7 @@ use uuid::Uuid;
 use crate::api::categories::category_dto::CategoryResponse;
 use crate::api::places::place_dto::PlaceResponse;
 use crate::api::reports::report_entity::Report;
+use crate::api::users::user_dto::UserResponse;
 use crate::lib::Validate;
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Validate)]
@@ -56,13 +57,15 @@ impl CreateReportDto {
     /// Converts the DTO into the entity ready for the database: generates the
     /// id and normalizes the fields (validation was already done by the
     /// `ValidatedJson` extractor with the `#[validate(...)]` decorators).
-    pub fn into_entity(self) -> Report {
+    /// The creator comes from the authenticated caller, never from the body.
+    pub fn into_entity(self, user_id: String) -> Report {
         Report {
             id: Uuid::new_v4().to_string(),
             name: self.name.trim().to_string(),
             description: self.description.trim().to_string(),
             category_id: self.category_id,
             place_id: self.place_id,
+            user_id: Some(user_id),
         }
     }
 }
@@ -115,7 +118,8 @@ pub struct UpdateReportDto {
 impl UpdateReportDto {
     /// Converts the DTO into the entity ready for the database: reuses the id
     /// from the path and normalizes the fields (validation was already done by
-    /// the extractor).
+    /// the extractor). `user_id` is always `None` here: the repository update
+    /// is a merge that never touches the creator.
     pub fn into_entity(self, id: String) -> Report {
         Report {
             id,
@@ -123,6 +127,7 @@ impl UpdateReportDto {
             description: self.description.trim().to_string(),
             category_id: self.category_id,
             place_id: self.place_id,
+            user_id: None,
         }
     }
 }
@@ -142,6 +147,9 @@ pub struct ReportResponse {
     pub category: Option<CategoryResponse>,
     /// Associated place (full object, present only if the relationship exists)
     pub place: Option<PlaceResponse>,
+    /// User who created the report (profile without the email; `null` only
+    /// for legacy rows created before authentication existed)
+    pub created_by: Option<UserResponse>,
 }
 
 impl
@@ -149,13 +157,15 @@ impl
         crate::api::reports::report_entity::Report,
         Option<CategoryResponse>,
         Option<PlaceResponse>,
+        Option<UserResponse>,
     )> for ReportResponse
 {
     fn from(
-        (report, category, place): (
+        (report, category, place, created_by): (
             crate::api::reports::report_entity::Report,
             Option<CategoryResponse>,
             Option<PlaceResponse>,
+            Option<UserResponse>,
         ),
     ) -> Self {
         Self {
@@ -164,6 +174,7 @@ impl
             description: report.description,
             category,
             place,
+            created_by,
         }
     }
 }

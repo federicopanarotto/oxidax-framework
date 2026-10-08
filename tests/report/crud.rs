@@ -5,18 +5,20 @@ use axum::http::{Request, StatusCode};
 use serde_json::json;
 use tower::ServiceExt;
 
-use crate::support::{app, json_body, json_request};
+use crate::support::{app, authorized_json_request, json_body, json_request, mint_access_token};
 
 #[tokio::test]
 async fn reports_full_crud_cycle() {
     let app = app().await;
+    let token = mint_access_token("550e8400-e29b-41d4-a716-446655440000").await;
 
     let response = app
         .clone()
-        .oneshot(json_request(
+        .oneshot(authorized_json_request(
             "POST",
             "/api/reports",
             json!({"name": "Vendite mensili", "description": "Report di ottobre"}),
+            &token,
         ))
         .await
         .unwrap();
@@ -105,12 +107,14 @@ async fn reports_full_crud_cycle() {
 #[tokio::test]
 async fn create_without_name_returns_422() {
     let app = app().await;
+    let token = mint_access_token("550e8400-e29b-41d4-a716-446655440000").await;
 
     let response = app
-        .oneshot(json_request(
+        .oneshot(authorized_json_request(
             "POST",
             "/api/reports",
             json!({"name": "", "description": "desc"}),
+            &token,
         ))
         .await
         .unwrap();
@@ -128,6 +132,7 @@ async fn create_without_name_returns_422() {
 #[tokio::test]
 async fn malformed_json_returns_400_with_details() {
     let app = app().await;
+    let token = mint_access_token("550e8400-e29b-41d4-a716-446655440000").await;
 
     let response = app
         .oneshot(
@@ -135,6 +140,7 @@ async fn malformed_json_returns_400_with_details() {
                 .method("POST")
                 .uri("/api/reports")
                 .header("content-type", "application/json")
+                .header("authorization", format!("Bearer {token}"))
                 .body(Body::from("{non-json"))
                 .unwrap(),
         )

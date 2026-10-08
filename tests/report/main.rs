@@ -3,6 +3,7 @@
 
 mod auth;
 mod categories;
+mod creator;
 mod crud;
 mod docs;
 mod places;

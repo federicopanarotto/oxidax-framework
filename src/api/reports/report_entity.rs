@@ -11,4 +11,7 @@ pub struct Report {
     pub category_id: Option<String>,
     /// Id of the associated place (`None` if the report has no place).
     pub place_id: Option<String>,
+    /// Id of the user who created the report (`None` only for legacy rows
+    /// created before authentication existed: new reports always have one).
+    pub user_id: Option<String>,
 }

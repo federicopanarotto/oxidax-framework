@@ -7,7 +7,7 @@ use axum::http::StatusCode;
 use crate::api::reports::report_dto::{CreateReportDto, ReportResponse, UpdateReportDto};
 use crate::api::reports::report_service::ReportService;
 use crate::errors::{AppResult, BadRequestResponse, ErrorResponse};
-use crate::framework::{ValidatedJson, ValidationErrorResponse, route};
+use crate::framework::{CurrentUser, ValidatedJson, ValidationErrorResponse, route};
 
 // Route table and OpenAPI spec of the reports, defined point-inline: every
 // handler is annotated with `#[utoipa::path(...)]` (HTTP method, path and
@@ -39,15 +39,21 @@ pub async fn list_reports(
     responses(
         (status = 201, description = "Report created successfully", body = ReportResponse),
         (status = 400, description = "Invalid request: malformed JSON body or non-existent category", body = BadRequestResponse),
+        (status = 401, description = "Missing or invalid access token", body = ErrorResponse),
         (status = 422, description = "Field validation failed", body = ValidationErrorResponse),
         (status = 503, description = "Database unavailable", body = ErrorResponse),
     ),
+    security(
+        ("accessToken" = []),
+    ),
 )]
+#[IsGranted]
 pub async fn create_report(
     State(service): State<Arc<ReportService>>,
+    current: CurrentUser,
     ValidatedJson(dto): ValidatedJson<CreateReportDto>,
 ) -> AppResult<(StatusCode, Json<ReportResponse>)> {
-    let created = service.create(dto).await?;
+    let created = service.create(&current.user_id, dto).await?;
     Ok((StatusCode::CREATED, Json(created)))
 }
 

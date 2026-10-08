@@ -12,6 +12,8 @@ use crate::errors::{AppError, AppResult};
 const TABLE: &str = "report";
 
 /// Row as it arrives from the database (the id is a SurrealDB record id).
+/// `user_id` is `Option` because rows created before authentication existed
+/// do not carry the field at all (a missing field deserializes to `None`).
 #[derive(Debug, Serialize, Deserialize, SurrealValue)]
 struct ReportRow {
     id: RecordId,
@@ -19,12 +21,24 @@ struct ReportRow {
     description: String,
     category_id: Option<String>,
     place_id: Option<String>,
+    user_id: Option<String>,
 }
 
 /// Persistable content: the id is managed by the database, it must not be
 /// written in the CONTENT.
 #[derive(Debug, Serialize, Deserialize, SurrealValue)]
 struct ReportContent {
+    name: String,
+    description: String,
+    category_id: Option<String>,
+    place_id: Option<String>,
+    user_id: Option<String>,
+}
+
+/// Fields rewritten by `replace`: `user_id` is deliberately absent, so the
+/// update is a merge that can never change who created the report.
+#[derive(Debug, Serialize, Deserialize, SurrealValue)]
+struct ReportPatch {
     name: String,
     description: String,
     category_id: Option<String>,
@@ -55,6 +69,7 @@ fn into_entity(row: ReportRow) -> Report {
         description: row.description,
         category_id: row.category_id,
         place_id: row.place_id,
+        user_id: row.user_id,
     }
 }
 
@@ -77,6 +92,7 @@ impl ReportRepository for SurrealReportRepository {
             description: report.description.clone(),
             category_id: report.category_id.clone(),
             place_id: report.place_id.clone(),
+            user_id: report.user_id.clone(),
         };
 
         let created: Option<ReportRow> = self
@@ -99,14 +115,16 @@ impl ReportRepository for SurrealReportRepository {
     }
 
     async fn replace(&self, id: &str, report: Report) -> AppResult<Option<Report>> {
-        let content = ReportContent {
+        // Merge instead of content: only the mutable fields are rewritten and
+        // the creator (`user_id`) is preserved as it is.
+        let patch = ReportPatch {
             name: report.name.clone(),
             description: report.description.clone(),
             category_id: report.category_id.clone(),
             place_id: report.place_id.clone(),
         };
 
-        let updated: Option<ReportRow> = self.db.update((TABLE, id)).content(content).await?;
+        let updated: Option<ReportRow> = self.db.update((TABLE, id)).merge(patch).await?;
         Ok(updated.map(into_entity))
     }
 

@@ -19,9 +19,9 @@ fn register(repositories: &db::Repositories, services: &mut ServiceCollection) {
     services.add(ReportService::singleton());
 }
 
-// Zero-touch self-registration in the feature registry. The `order` of 2
-// guarantees that the dependencies of reports (categories, places) are
-// registered first.
+// Zero-touch self-registration in the feature registry. The `order` of 3
+// guarantees that the dependencies of reports (categories, places and the
+// users service for the creator) are registered first.
 inventory::submit! {
-    Feature::new(2, register)
+    Feature::new(3, register)
 }

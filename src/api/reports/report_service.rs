@@ -9,6 +9,8 @@ use crate::api::places::place_service::PlaceService;
 use crate::api::reports::report_dto::{CreateReportDto, ReportResponse, UpdateReportDto};
 use crate::api::reports::report_entity::Report;
 use crate::api::reports::report_repository::ReportRepository;
+use crate::api::users::user_dto::UserResponse;
+use crate::api::users::user_service::UserService;
 use crate::errors::{AppError, AppResult};
 
 /// Business rules for reports.
@@ -16,17 +18,20 @@ use crate::errors::{AppError, AppResult};
 /// The DTOs arrive already converted and validated (id generated, trimmed,
 /// UUID format checked by the `ValidatedJson` extractors): here the service
 /// only writes ready-made data to the repository. Only the domain validation
-/// that requires the database remains (existence of the category).
+/// that requires the database remains (existence of the category); the
+/// creator comes from the authenticated caller and is never validated against
+/// the database (it was just verified by the guard).
 #[injectable]
 pub struct ReportService {
     repository: Arc<dyn ReportRepository>,
     categories: Arc<CategoryService>,
     places: Arc<PlaceService>,
+    users: Arc<UserService>,
 }
 
 impl ReportService {
-    pub async fn create(&self, dto: CreateReportDto) -> AppResult<ReportResponse> {
-        let report = dto.into_entity();
+    pub async fn create(&self, user_id: &str, dto: CreateReportDto) -> AppResult<ReportResponse> {
+        let report = dto.into_entity(user_id.to_string());
         self.validate_category_id(&report.category_id).await?;
         self.validate_place_id(&report.place_id).await?;
 
@@ -47,6 +52,7 @@ impl ReportService {
         let reports = self.repository.find_all().await?;
         let categories = self.categories.by_id().await?;
         let places = self.places.by_id().await?;
+        let users = self.users.by_id().await?;
 
         Ok(reports
             .into_iter()
@@ -59,7 +65,11 @@ impl ReportService {
                     .place_id
                     .as_ref()
                     .and_then(|id| places.get(id).cloned());
-                (report, category, place).into()
+                let created_by = report
+                    .user_id
+                    .as_ref()
+                    .and_then(|id| users.get(id).cloned());
+                (report, category, place, created_by).into()
             })
             .collect())
     }
@@ -109,12 +119,13 @@ impl ReportService {
         Ok(())
     }
 
-    /// Composes the response by nesting the `category` and `place` objects (if
-    /// the relationships exist).
+    /// Composes the response by nesting the `category`, `place` and
+    /// `created_by` objects (if the relationships exist).
     async fn decorate(&self, report: Report) -> AppResult<ReportResponse> {
         let category = self.category_of(&report).await?;
         let place = self.place_of(&report).await?;
-        Ok((report, category, place).into())
+        let created_by = self.creator_of(&report).await?;
+        Ok((report, category, place, created_by).into())
     }
 
     async fn category_of(&self, report: &Report) -> AppResult<Option<CategoryResponse>> {
@@ -127,6 +138,13 @@ impl ReportService {
     async fn place_of(&self, report: &Report) -> AppResult<Option<PlaceResponse>> {
         match &report.place_id {
             Some(place_id) => self.places.find(place_id).await,
+            None => Ok(None),
+        }
+    }
+
+    async fn creator_of(&self, report: &Report) -> AppResult<Option<UserResponse>> {
+        match &report.user_id {
+            Some(user_id) => self.users.find(user_id).await,
             None => Ok(None),
         }
     }

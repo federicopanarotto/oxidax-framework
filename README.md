@@ -52,7 +52,7 @@ src/
 │       ├── category_service.rs       # logica di dominio
 │       └── category_controller.rs    # gli handler HTTP con #[route]
 │   ├── places/               # feature "places" (city, address, cap, provenance)
-│   ├── reports/              # feature "reports" (dipende da categories e places)
+│   ├── reports/              # feature "reports" (dipende da categories, places e users)
 │   ├── users/                # feature "users" (/api/users/me, lista admin)
 │   └── auth/                 # feature "auth" (register/login/refresh/logout)
 ├── lib/                      # il "core" del framework
@@ -202,7 +202,7 @@ cargo run
 ## Test
 
 ```bash
-cargo test          # integration test end-to-end su HTTP reali (30 test)
+cargo test          # integration test end-to-end su HTTP reali (34 test)
 cargo clippy --all-targets -- -D warnings
 cargo fmt --check
 ```
@@ -218,6 +218,8 @@ cargo fmt --check
 - [x] Swagger UI live
 - [x] Access log (middleware esterno) + autenticazione JWT con guard
       **per-rotta** (`#[IsGranted]`, ruoli inclusi)
+- [x] Report con creatore: `POST /api/reports` autenticato, l'utente del token
+      viene salvato e restituito come `created_by` nelle letture
 - [ ] Paginazione/ordinamento e altre utilità da riusare tra le feature
 
 > **Nota**: il framework è in costruzione e serve a imparare: l'API pubblica

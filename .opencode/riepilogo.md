@@ -53,14 +53,14 @@ src/
     ├── features.rs    # GENERICO: provider(config) + route_bundles(&provider)
     ├── router.rs      # GENERICO: merge rotte + health + swagger + fallback + access_log
     ├── docs.rs        # GENERICO: build OpenApi da frammenti + swagger_router
-    │                  #   + scheme accessToken/refreshToken (HTTP bearer JWT, unica modifica one-time)
+    │                  #   + scheme accessToken (HTTP bearer JWT, unica modifica one-time)
     ├── categories/    # feature: entity, dto, repository, surreal_*, service, controller, mod
     ├── places/        # feature: city, address, cap, provenance
-    ├── reports/       # feature: dipende da categories e places
-    ├── users/         # feature (order 3): /api/users/me, /api/users (admin)
+    ├── reports/       # feature (order 3): dipende da categories, places e users
+    ├── users/         # feature (order 2): /api/users/me, /api/users (admin)
     └── auth/          # feature (order 4): register/login/refresh/logout
 framework-macros/      # proc-macro #[route] (consuma #[IsGranted])
-tests/report/          # integration test HTTP reali (backend mem://), auth.rs incluso
+tests/report/          # integration test HTTP reali (backend mem://), auth + creator inclusi
 ADD-FEATURE.md         # guida: come aggiungere una feature (esempio Places)
 ```
 
@@ -87,7 +87,7 @@ ADD-FEATURE.md         # guida: come aggiungere una feature (esempio Places)
   `services.add(XService::singleton())`.
 - `#[injectable]` (more-di) genera il costruttore; i campi sono `Arc<...>`.
   Serve `use di::Injectable;` per `.singleton()`.
-- **Order attuale**: categories = 0, places = 1, reports = 2, users = 3,
+- **Order attuale**: categories = 0, places = 1, users = 2, reports = 3,
   auth = 4 (dipendenze prima); `lib/auth` core = ordine 0 (registra identity
   repo + `JwtConfig` lazy da `Arc<Config>`). L'iniezione è lazy, quindi
   l'ordine è una cintura di sicurezza.
@@ -164,17 +164,27 @@ o `ValidationErrorResponse`.
 | (auth core)| 0     | `user_identity`  | `src/lib/auth`: JWT, password, guard, `CurrentUser`          |
 | categories | 0     | `category`       | CRUD `/api/categories`                                       |
 | places     | 1     | `place`          | CRUD `/api/places` (city, address, cap, provenance)         |
-| reports    | 2     | `report`         | CRUD `/api/reports`; relazioni con categories e places      |
-| users      | 3     | `user`           | `GET /api/users/me`, `GET /api/users` (solo admin)          |
+| users      | 2     | `user`           | `GET /api/users/me`, `GET /api/users` (solo admin)          |
+| reports    | 3     | `report`         | CRUD `/api/reports`; creatore + relazioni con categories/places |
 | auth       | 4     | —                | register/login/refresh/logout (`/api/auth/*`)                |
 
-- `Report` (entity) ha `category_id: Option<String>` e `place_id: Option<String>`.
+- `Report` (entity) ha `category_id: Option<String>`, `place_id: Option<String>`
+  e `user_id: Option<String>` (creatore; `None` solo sulle righe legacy).
+- Il creatore **non sta nei DTO di richiesta**: arriva dal token
+  (`#[IsGranted]` → `CurrentUser.user_id` → `service.create(&user_id, dto)`).
 - In **risposta** NON si espongono gli `*_id`: solo gli oggetti annidati
-  `category: Option<CategoryResponse>` e `place: Option<PlaceResponse>`
-  (`From<(Report, Option<CategoryResponse>, Option<PlaceResponse>)>`).
-- `ReportService` valida l'esistenza di category/place (→ 400 `validation_error`)
-  e "decora" il singolo via `find` e le liste via `by_id()` (index `HashMap`,
-  no N+1).
+  `category`, `place` e `created_by` (`Option<UserResponse>` **senza email**:
+  l'email resta solo per `/me` e per l'admin) — tuple `From` a 4 elementi.
+- `POST /api/reports` è l'unica rotta reports protetta (`#[IsGranted]` +
+  401/security in OpenAPI); le letture restano pubbliche e comunque
+  riportano `created_by`. Gli altri write method restano pubblici.
+- `ReportService` valida l'esistenza di category/place (→ 400
+  `validation_error`), non valida il creatore (è appena verificato dal
+  guard; se l'utente sparisce la decorazione degrada a `null`) e "decora"
+  il singolo via `find` e le liste via `by_id()` (index `HashMap`, no N+1);
+  inietta `UserService` (service → service).
+- `replace` dei report è un **merge** con patch senza `user_id`: l'update non
+  può mai riscrivere il creatore.
 
 ## Convenzioni (da rispettare)
 
@@ -196,13 +206,15 @@ o `ValidationErrorResponse`.
 
 ## Stato e verifica
 
-- **Test**: 30 integration (HTTP reali, backend `mem://`, 13 in `auth.rs`) +
-  1 doctest (facade).
+- **Test**: 34 integration (HTTP reali, backend `mem://`: 13 in `auth.rs`,
+  4 in `service.rs`, 4 in `crud.rs`, 5 in `categories.rs`, 4 in `places.rs`,
+  3 in `creator.rs`, 1 in `docs.rs`) + 1 doctest (facade).
 - `cargo clippy --all-targets -- -D warnings` e `cargo fmt` puliti.
-- `git`: branch `main`, working tree **non pulito** (feature auth + users +
-  doc da committare). Ultimo commit
-  `72bff5e feat: add places feature with CRUD operations and integration with reports`.
-- **Server fermo** (porta 3000 libera).
+- `git`: branch `main`, working tree **non pulito** (feature "report con
+  creatore" + docs da committare). Ultimo commit
+  `cb251d4 chore: remove refreshToken documentation from security schemes in OpenAPI spec`.
+- **Porta 3000 occupata**: è il server debug dell'utente dentro il container
+  (publish Docker) — non toccare; i server temporanei usano altre porte.
 - **Non committare senza richiesta esplicita dell'utente.**
 
 ## Comandi (dev container)
@@ -234,10 +246,16 @@ Surreal) o `cargo run` (SurrealDB da `.env`). UI: http://localhost:3000/swagger-
 - **Lo schema del DB reale lo possiede solo `ensure_schema`**: `DEFINE FIELD`
   aggiunti a mano (console/Studio) entrano in conflitto con il codice e
   rompono le scritture con `503 Couldn't coerce ... Expected uuid/record<> but
-  found '...'` (i test `mem://` non lo vedono perché il DB è pulito). Simptomi:
+  found '...'` (i test `mem://` non lo vedono perché il DB è pulito). Sintomi:
   place/category/report non si creano, auth/user ok. Fix: `REMOVE FIELD ...`
   (i dati restano). Verificato il 2026-10-08: 11 field manuali rimossi da
   `test/reports`, E2E 15/15 sul DB reale.
+- **Studio può creare tabelle `SCHEMAFULL`** (designer di tabella): senza
+  campi definiti le scritture vengono rifiutate con
+  `503 Found field 'x', but no such field exists for table 'y'` (register o
+  login rotti). `DEFINE TABLE IF NOT EXISTS ... SCHEMALESS` **non** corregge
+  una tabella esistente: serve `ALTER TABLE <t> SCHEMALESS` (i dati restano).
+  Verificato il 2026-10-08 su `test/reports` (`user_identity`).
 - `#[utoipa::path]` accetta solo funzioni libere, non metodi; quindi niente
   classi controller.
 - I custom validator di `validator` devono ritornare `Result<(), ValidationError>`.

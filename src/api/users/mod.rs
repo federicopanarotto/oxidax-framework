@@ -20,7 +20,8 @@ fn register(repositories: &db::Repositories, services: &mut ServiceCollection) {
     services.add(UserService::singleton());
 }
 
-// Zero-touch self-registration in the feature registry.
+// Zero-touch self-registration in the feature registry (order 2: the reports
+// feature depends on the users service to decorate the creator).
 inventory::submit! {
-    Feature::new(3, register)
+    Feature::new(2, register)
 }

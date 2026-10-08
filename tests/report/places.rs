@@ -5,7 +5,7 @@ use axum::http::{Request, StatusCode};
 use serde_json::json;
 use tower::ServiceExt;
 
-use crate::support::{app, json_body, json_request};
+use crate::support::{app, authorized_json_request, json_body, json_request, mint_access_token};
 
 #[tokio::test]
 async fn places_full_crud_cycle() {
@@ -157,9 +157,10 @@ async fn report_accepts_existing_place() {
     let place = json_body(response).await;
     let place_id = place["id"].as_str().expect("id place").to_string();
 
+    let token = mint_access_token("550e8400-e29b-41d4-a716-446655440000").await;
     let response = app
         .clone()
-        .oneshot(json_request(
+        .oneshot(authorized_json_request(
             "POST",
             "/api/reports",
             json!({
@@ -167,6 +168,7 @@ async fn report_accepts_existing_place() {
                 "description": "desc",
                 "place_id": place_id,
             }),
+            &token,
         ))
         .await
         .unwrap();
@@ -181,9 +183,10 @@ async fn report_accepts_existing_place() {
 #[tokio::test]
 async fn report_rejects_unknown_place() {
     let app = app().await;
+    let token = mint_access_token("550e8400-e29b-41d4-a716-446655440000").await;
 
     let response = app
-        .oneshot(json_request(
+        .oneshot(authorized_json_request(
             "POST",
             "/api/reports",
             json!({
@@ -191,6 +194,7 @@ async fn report_rejects_unknown_place() {
                 "description": "Senza place valido",
                 "place_id": "00000000-0000-0000-0000-000000000000",
             }),
+            &token,
         ))
         .await
         .unwrap();
