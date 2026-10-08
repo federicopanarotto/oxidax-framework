@@ -25,7 +25,6 @@ pub struct ApiDoc;
 /// annotations of the endpoints: OpenAPI does not create them automatically.
 ///
 /// - `accessToken`: short-lived JWT sent on every protected request;
-/// - `refreshToken`: single-use JWT sent only to `/api/auth/refresh`.
 struct SecuritySchemes;
 
 impl Modify for SecuritySchemes {
