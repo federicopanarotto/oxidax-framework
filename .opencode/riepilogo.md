@@ -1,5 +1,12 @@
 # riepilogo
 
+## Feature `Places` + relazione su `reports` (08/10)
+- [x] **Nuova feature `src/api/places/`** (entity, dto, repository trait, surreal repo, service, controller, mod wiring) con `city`, `address`, `cap`, `provenance`; validazione (not_blank + length) nei DTO, CRUD REST su `/api/places` con `#[route]`.
+- [x] **Wiring**: `pub mod places;` in `src/api/mod.rs`; repository registrato in `src/db/mod.rs` (`Repositories.places` + `ensure_schema`); `Feature::new(1, register)` in `places/mod.rs`.
+- [x] **Relazione report → place** (stesso pattern di categories): `place_id: Option<String>` nell'entity/DTO/surreal repo; `ReportService` dipende da `PlaceService`, valida l'esistenza (400 `validation error` se manca) e annida `place: Option<PlaceResponse>` nella response (senza esporre `place_id`, come già per `category`). Ordine di `reports` alzato a 2.
+- [x] **Test**: aggiunti `tests/report/places.rs` (CRUD + relazione + unknown place + blank city) e `mod places;` in `main.rs`. Verifiche: `cargo test` **17/17** + doctest ✓; clippy ✓; fmt ✓.
+- [x] **README** aggiornato (struttura + conteggio test). **`ADD-FEATURE.md`**: guida passo-passo che documenta proprio questa feature.
+
 ## Access log richieste (08/10)
 - [x] **Middleware `src/lib/middlewares/access_log.rs`** (`axum::middleware::from_fn`): misura la latenza e logga una riga compatta per ogni richiesta, formato `METODO path status elapsed_ms` → es. `POST /api/reports 201 3ms`. Usa `as_u16()` per lo status (solo codice numerico, senza reason phrase); path + query string.
 - [x] Montato outermost in `router.rs` con `.layer(from_fn(access_log))`, così copre tutte le rotte, il fallback e la Swagger UI.

@@ -3,6 +3,7 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::api::categories::category_dto::CategoryResponse;
+use crate::api::places::place_dto::PlaceResponse;
 use crate::api::reports::report_entity::Report;
 use crate::lib::Validate;
 
@@ -42,6 +43,13 @@ pub struct CreateReportDto {
         message = "The category id must be a valid UUID"
     ))]
     pub category_id: Option<String>,
+    /// Id of the associated place (optional; `null` or absent removes the relationship)
+    #[schema(example = "550e8400-e29b-41d4-a716-446655440000")]
+    #[validate(custom(
+        function = "crate::lib::validators::validate_uuid",
+        message = "The place id must be a valid UUID"
+    ))]
+    pub place_id: Option<String>,
 }
 
 impl CreateReportDto {
@@ -54,6 +62,7 @@ impl CreateReportDto {
             name: self.name.trim().to_string(),
             description: self.description.trim().to_string(),
             category_id: self.category_id,
+            place_id: self.place_id,
         }
     }
 }
@@ -94,6 +103,13 @@ pub struct UpdateReportDto {
         message = "The category id must be a valid UUID"
     ))]
     pub category_id: Option<String>,
+    /// Id of the associated place (optional; `null` or absent removes the relationship)
+    #[schema(example = "550e8400-e29b-41d4-a716-446655440000")]
+    #[validate(custom(
+        function = "crate::lib::validators::validate_uuid",
+        message = "The place id must be a valid UUID"
+    ))]
+    pub place_id: Option<String>,
 }
 
 impl UpdateReportDto {
@@ -106,6 +122,7 @@ impl UpdateReportDto {
             name: self.name.trim().to_string(),
             description: self.description.trim().to_string(),
             category_id: self.category_id,
+            place_id: self.place_id,
         }
     }
 }
@@ -123,18 +140,22 @@ pub struct ReportResponse {
     pub description: String,
     /// Associated category (full object, present only if the relationship exists)
     pub category: Option<CategoryResponse>,
+    /// Associated place (full object, present only if the relationship exists)
+    pub place: Option<PlaceResponse>,
 }
 
 impl
     From<(
         crate::api::reports::report_entity::Report,
         Option<CategoryResponse>,
+        Option<PlaceResponse>,
     )> for ReportResponse
 {
     fn from(
-        (report, category): (
+        (report, category, place): (
             crate::api::reports::report_entity::Report,
             Option<CategoryResponse>,
+            Option<PlaceResponse>,
         ),
     ) -> Self {
         Self {
@@ -142,6 +163,7 @@ impl
             name: report.name,
             description: report.description,
             category,
+            place,
         }
     }
 }

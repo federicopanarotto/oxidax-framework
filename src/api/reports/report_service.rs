@@ -4,6 +4,8 @@ use di::injectable;
 
 use crate::api::categories::category_dto::CategoryResponse;
 use crate::api::categories::category_service::CategoryService;
+use crate::api::places::place_dto::PlaceResponse;
+use crate::api::places::place_service::PlaceService;
 use crate::api::reports::report_dto::{CreateReportDto, ReportResponse, UpdateReportDto};
 use crate::api::reports::report_entity::Report;
 use crate::api::reports::report_repository::ReportRepository;
@@ -19,12 +21,14 @@ use crate::errors::{AppError, AppResult};
 pub struct ReportService {
     repository: Arc<dyn ReportRepository>,
     categories: Arc<CategoryService>,
+    places: Arc<PlaceService>,
 }
 
 impl ReportService {
     pub async fn create(&self, dto: CreateReportDto) -> AppResult<ReportResponse> {
         let report = dto.into_entity();
         self.validate_category_id(&report.category_id).await?;
+        self.validate_place_id(&report.place_id).await?;
 
         let report = self.repository.insert(report).await?;
         self.decorate(report).await
@@ -42,6 +46,7 @@ impl ReportService {
     pub async fn list(&self) -> AppResult<Vec<ReportResponse>> {
         let reports = self.repository.find_all().await?;
         let categories = self.categories.by_id().await?;
+        let places = self.places.by_id().await?;
 
         Ok(reports
             .into_iter()
@@ -50,7 +55,11 @@ impl ReportService {
                     .category_id
                     .as_ref()
                     .and_then(|id| categories.get(id).cloned());
-                (report, category).into()
+                let place = report
+                    .place_id
+                    .as_ref()
+                    .and_then(|id| places.get(id).cloned());
+                (report, category, place).into()
             })
             .collect())
     }
@@ -58,6 +67,7 @@ impl ReportService {
     pub async fn update(&self, id: &str, dto: UpdateReportDto) -> AppResult<ReportResponse> {
         let report = dto.into_entity(id.to_string());
         self.validate_category_id(&report.category_id).await?;
+        self.validate_place_id(&report.place_id).await?;
 
         let report = self
             .repository
@@ -89,16 +99,34 @@ impl ReportService {
         Ok(())
     }
 
-    /// Composes the response by nesting the `category` object (if the
-    /// relationship exists).
+    /// Validates the relationship with places (existence of the place).
+    async fn validate_place_id(&self, place_id: &Option<String>) -> AppResult<()> {
+        if let Some(id) = place_id
+            && !self.places.exists(id).await?
+        {
+            return Err(AppError::Validation(format!("place {id} not found")));
+        }
+        Ok(())
+    }
+
+    /// Composes the response by nesting the `category` and `place` objects (if
+    /// the relationships exist).
     async fn decorate(&self, report: Report) -> AppResult<ReportResponse> {
         let category = self.category_of(&report).await?;
-        Ok((report, category).into())
+        let place = self.place_of(&report).await?;
+        Ok((report, category, place).into())
     }
 
     async fn category_of(&self, report: &Report) -> AppResult<Option<CategoryResponse>> {
         match &report.category_id {
             Some(category_id) => self.categories.find(category_id).await,
+            None => Ok(None),
+        }
+    }
+
+    async fn place_of(&self, report: &Report) -> AppResult<Option<PlaceResponse>> {
+        match &report.place_id {
+            Some(place_id) => self.places.find(place_id).await,
             None => Ok(None),
         }
     }

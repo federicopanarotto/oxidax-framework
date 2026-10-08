@@ -9,13 +9,11 @@ use utoipa_swagger_ui::SwaggerUi;
 /// handlers collected by `utoipa-axum`), so `docs.rs` never needs to be
 /// touched when adding a feature.
 #[derive(OpenApi)]
-#[openapi(
-    info(
-        title = "Axum Reports API",
-        version = "0.1.0",
-        description = "CRUD API per la gestione dei report e delle categorie"
-    )
-)]
+#[openapi(info(
+    title = "Axum Reports API",
+    version = "0.1.0",
+    description = "CRUD API per la gestione dei report e delle categorie"
+))]
 pub struct ApiDoc;
 
 /// Merges the OpenAPI components produced by individual features into the

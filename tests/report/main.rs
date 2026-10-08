@@ -4,5 +4,6 @@
 mod categories;
 mod crud;
 mod docs;
+mod places;
 mod service;
 mod support;

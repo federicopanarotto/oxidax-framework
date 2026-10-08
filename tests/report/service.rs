@@ -19,6 +19,7 @@ async fn create_trims_name_and_description() {
             name: "  Vendite mensili  ".into(),
             description: "  Report di prova  ".into(),
             category_id: None,
+            place_id: None,
         })
         .await
         .expect("report creato");
@@ -43,6 +44,7 @@ async fn create_rejects_unknown_category() {
             name: "Report".into(),
             description: "desc".into(),
             category_id: Some("00000000-0000-0000-0000-000000000000".into()),
+            place_id: None,
         })
         .await
         .unwrap_err();

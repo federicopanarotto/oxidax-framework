@@ -18,6 +18,7 @@ struct ReportRow {
     name: String,
     description: String,
     category_id: Option<String>,
+    place_id: Option<String>,
 }
 
 /// Persistable content: the id is managed by the database, it must not be
@@ -27,6 +28,7 @@ struct ReportContent {
     name: String,
     description: String,
     category_id: Option<String>,
+    place_id: Option<String>,
 }
 
 pub struct SurrealReportRepository {
@@ -52,6 +54,7 @@ fn into_entity(row: ReportRow) -> Report {
         name: row.name,
         description: row.description,
         category_id: row.category_id,
+        place_id: row.place_id,
     }
 }
 
@@ -73,6 +76,7 @@ impl ReportRepository for SurrealReportRepository {
             name: report.name.clone(),
             description: report.description.clone(),
             category_id: report.category_id.clone(),
+            place_id: report.place_id.clone(),
         };
 
         let created: Option<ReportRow> = self
@@ -99,6 +103,7 @@ impl ReportRepository for SurrealReportRepository {
             name: report.name.clone(),
             description: report.description.clone(),
             category_id: report.category_id.clone(),
+            place_id: report.place_id.clone(),
         };
 
         let updated: Option<ReportRow> = self.db.update((TABLE, id)).content(content).await?;

@@ -9,4 +9,6 @@ pub struct Report {
     pub description: String,
     /// Id of the associated category (`None` if the report has no category).
     pub category_id: Option<String>,
+    /// Id of the associated place (`None` if the report has no place).
+    pub place_id: Option<String>,
 }

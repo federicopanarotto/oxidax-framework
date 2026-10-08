@@ -50,7 +50,8 @@ src/
 │       ├── surreal_category_repository.rs  # implementazione per SurrealDB
 │       ├── category_service.rs       # logica di dominio
 │       └── category_controller.rs    # gli handler HTTP con #[route]
-│   └── reports/              # feature "reports" (dipende da categories)
+│   ├── places/               # feature "places" (city, address, cap, provenance)
+│   └── reports/              # feature "reports" (dipende da categories e places)
 ├── lib/                      # il "core" del framework
 │   ├── registry.rs           # registri statici Feature (DI) e Route
 │   ├── validators.rs         # estrattori ValidatedJson/Query/Params
@@ -155,7 +156,7 @@ cargo run
 ## Test
 
 ```bash
-cargo test          # integration test end-to-end su HTTP reali (13 test)
+cargo test          # integration test end-to-end su HTTP reali (17 test)
 cargo clippy --all-targets -- -D warnings
 cargo fmt --check
 ```
