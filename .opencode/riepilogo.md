@@ -139,6 +139,9 @@ o `ValidationErrorResponse`.
   deserializzano e validano **prima** dell'handler.
 - DTO con `#[derive(Validate)]` e `#[validate(custom = not_blank, length(max=...))]`;
   `validate_uuid` sugli `Option<String>` id.
+- DTO di query: `XxxQueryDto` (es. `UserListQueryDto`) + `ValidatedQuery<...>`;
+  i valori ammessi da un enum si validano con un custom validator locale al
+  modulo (`validate_role`, feature-local: usa le costanti di `user_entity`).
 - `into_entity()` nei DTO: genera l'uuid e fa `.trim()` → il service riceve dati pronti.
 
 ### Access log
@@ -164,7 +167,7 @@ o `ValidationErrorResponse`.
 | (auth core)| 0     | `user_identity`  | `src/lib/auth`: JWT, password, guard, `CurrentUser`          |
 | categories | 0     | `category`       | CRUD `/api/categories`                                       |
 | places     | 1     | `place`          | CRUD `/api/places` (city, address, cap, provenance)         |
-| users      | 2     | `user`           | `GET /api/users/me`, `GET /api/users` (solo admin)          |
+| users      | 2     | `user`           | `GET /api/users/me`; `GET /api/users?role=` (solo admin)     |
 | reports    | 3     | `report`         | CRUD `/api/reports`; creatore + relazioni con categories/places |
 | auth       | 4     | —                | register/login/refresh/logout (`/api/auth/*`)                |
 
@@ -173,11 +176,17 @@ o `ValidationErrorResponse`.
 - Il creatore **non sta nei DTO di richiesta**: arriva dal token
   (`#[IsGranted]` → `CurrentUser.user_id` → `service.create(&user_id, dto)`).
 - In **risposta** NON si espongono gli `*_id`: solo gli oggetti annidati
-  `category`, `place` e `created_by` (`Option<UserResponse>` **senza email**:
-  l'email resta solo per `/me` e per l'admin) — tuple `From` a 4 elementi.
-- `POST /api/reports` è l'unica rotta reports protetta (`#[IsGranted]` +
-  401/security in OpenAPI); le letture restano pubbliche e comunque
-  riportano `created_by`. Gli altri write method restano pubblici.
+  `category`, `place` e `created_by` (`Option<UserSummaryResponse>` — id,
+  nome, cognome, ruolo: **nessun campo email**, nemmeno `null`). L'email resta
+  solo per `/me` e per la lista admin (`UserResponse` con `email`).
+- `GET /api/users` accetta il query param **`role`** (`admin`/`user`): DTO
+  `UserListQueryDto` validato da `ValidatedQuery` (valore fuori elenco → **422**
+  con `details` sul campo `role`); il filtro arriva al repository
+  (`find_by_role`, `WHERE role = $value`) solo per valori già validati. La guard
+  admin gira **prima** dell'extractor → un non-admin vede sempre 403.
+- I write method dei report (`POST`, `PUT`, `DELETE`) sono protetti
+  (`#[IsGranted]` + 401/security in OpenAPI); le letture restano pubbliche e
+  comunque riportano `created_by`.
 - `ReportService` valida l'esistenza di category/place (→ 400
   `validation_error`), non valida il creatore (è appena verificato dal
   guard; se l'utente sparisce la decorazione degrada a `null`) e "decora"
@@ -203,15 +212,20 @@ o `ValidationErrorResponse`.
    `utoipa::path` `security(...)` + 401/403 documentati.
 9. Auth: email = identifier; risposte generiche per login/register (no
    enumerazione); refresh monouso.
+10. Query param: DTO `XxxQueryDto` + `ValidatedQuery<...>`; i valori ammessi
+    si validano con un custom validator (locale al modulo se legato al dominio).
 
 ## Stato e verifica
 
-- **Test**: 34 integration (HTTP reali, backend `mem://`: 13 in `auth.rs`,
-  4 in `service.rs`, 4 in `crud.rs`, 5 in `categories.rs`, 4 in `places.rs`,
-  3 in `creator.rs`, 1 in `docs.rs`) + 1 doctest (facade).
+- **Test**: 37 integration (HTTP reali, backend `mem://`: 13 in `auth.rs`,
+  5 in `crud.rs`, 5 in `categories.rs`, 4 in `places.rs`, 4 in `service.rs`,
+  3 in `creator.rs`, 2 in `users.rs`, 1 in `docs.rs`) + 1 doctest (facade).
+  Verificati in sessione anche 27/27 di E2E sul SurrealDB **reale** (query
+  `role`, created_by senza email, PUT/DELETE protetti).
 - `cargo clippy --all-targets -- -D warnings` e `cargo fmt` puliti.
 - `git`: branch `main`, working tree **non pulito** (feature "report con
-  creatore" + docs da committare). Ultimo commit
+  creatore" + query param `role` + protezione PUT/DELETE report, con docs da
+  committare). Ultimo commit
   `cb251d4 chore: remove refreshToken documentation from security schemes in OpenAPI spec`.
 - **Porta 3000 occupata**: è il server debug dell'utente dentro il container
   (publish Docker) — non toccare; i server temporanei usano altre porte.
@@ -259,6 +273,9 @@ Surreal) o `cargo run` (SurrealDB da `.env`). UI: http://localhost:3000/swagger-
 - `#[utoipa::path]` accetta solo funzioni libere, non metodi; quindi niente
   classi controller.
 - I custom validator di `validator` devono ritornare `Result<(), ValidationError>`.
+- **SurrealDB 3** ha rinominato `type::thing` → **`type::record`**: nei SQL
+  manuali (console/HTTP) `type::thing(...)` dà parse error
+  `Invalid function/constant path, did you maybe mean type::record`.
 - I test si appoggiano al `.env` (perché `Config::from_env` richiede le variabili):
   su ambienti senza `.env` vanno passate le env o copiato `.env.example`.
 

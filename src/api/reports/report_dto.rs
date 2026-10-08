@@ -5,7 +5,7 @@ use uuid::Uuid;
 use crate::api::categories::category_dto::CategoryResponse;
 use crate::api::places::place_dto::PlaceResponse;
 use crate::api::reports::report_entity::Report;
-use crate::api::users::user_dto::UserResponse;
+use crate::api::users::user_dto::UserSummaryResponse;
 use crate::lib::Validate;
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Validate)]
@@ -147,9 +147,9 @@ pub struct ReportResponse {
     pub category: Option<CategoryResponse>,
     /// Associated place (full object, present only if the relationship exists)
     pub place: Option<PlaceResponse>,
-    /// User who created the report (profile without the email; `null` only
+    /// User who created the report (profile without the email, `null` only
     /// for legacy rows created before authentication existed)
-    pub created_by: Option<UserResponse>,
+    pub created_by: Option<UserSummaryResponse>,
 }
 
 impl
@@ -157,7 +157,7 @@ impl
         crate::api::reports::report_entity::Report,
         Option<CategoryResponse>,
         Option<PlaceResponse>,
-        Option<UserResponse>,
+        Option<UserSummaryResponse>,
     )> for ReportResponse
 {
     fn from(
@@ -165,7 +165,7 @@ impl
             crate::api::reports::report_entity::Report,
             Option<CategoryResponse>,
             Option<PlaceResponse>,
-            Option<UserResponse>,
+            Option<UserSummaryResponse>,
         ),
     ) -> Self {
         Self {

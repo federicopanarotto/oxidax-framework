@@ -244,7 +244,7 @@ async fn update_can_remove_category() {
 
     let response = app
         .clone()
-        .oneshot(json_request(
+        .oneshot(authorized_json_request(
             "PUT",
             &format!("/api/reports/{report_id}"),
             json!({
@@ -252,6 +252,7 @@ async fn update_can_remove_category() {
                 "description": "desc",
                 "category_id": null,
             }),
+            &token,
         ))
         .await
         .unwrap();

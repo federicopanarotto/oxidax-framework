@@ -13,5 +13,8 @@ pub trait UserRepository: Send + Sync {
     async fn insert(&self, user: User) -> AppResult<User>;
     async fn find_by_id(&self, id: &str) -> AppResult<Option<User>>;
     async fn find_all(&self) -> AppResult<Vec<User>>;
+    /// Users with the exact role (the query filter of the list: the service
+    /// only passes values already validated at the DTO level).
+    async fn find_by_role(&self, role: &str) -> AppResult<Vec<User>>;
     async fn remove(&self, id: &str) -> AppResult<bool>;
 }

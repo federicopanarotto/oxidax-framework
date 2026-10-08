@@ -156,7 +156,7 @@ dal logout).
 | `POST /api/auth/refresh` | nuovo pair; il vecchio refresh token smette di funzionare           |
 | `POST /api/auth/logout`  | `204`: azzera il `jti` → il refresh token outstandig è revocato     |
 | `GET /api/users/me`      | profilo del chiamante con email                                      |
-| `GET /api/users`         | lista utenti con email, solo `admin`                                 |
+| `GET /api/users`         | lista utenti con email, solo `admin`; filtro opzionale `?role=admin\|user` |
 
 Errori **generici** per design: email ignota e password sbagliata danno lo
 stesso `401 invalid credentials`, il doppio register dà `409` generico (niente
@@ -202,7 +202,7 @@ cargo run
 ## Test
 
 ```bash
-cargo test          # integration test end-to-end su HTTP reali (34 test)
+cargo test          # integration test end-to-end su HTTP reali (37 test)
 cargo clippy --all-targets -- -D warnings
 cargo fmt --check
 ```
@@ -219,7 +219,10 @@ cargo fmt --check
 - [x] Access log (middleware esterno) + autenticazione JWT con guard
       **per-rotta** (`#[IsGranted]`, ruoli inclusi)
 - [x] Report con creatore: `POST /api/reports` autenticato, l'utente del token
-      viene salvato e restituito come `created_by` nelle letture
+      viene salvato e restituito come `created_by` nelle letture; anche
+      `PUT`/`DELETE` sono autenticati, le letture restano pubbliche
+- [x] Query param validati: `GET /api/users?role=admin|user` (`UserListQueryDto`
+      con `ValidatedQuery`, `422` sui valori fuori elenco)
 - [ ] Paginazione/ordinamento e altre utilità da riusare tra le feature
 
 > **Nota**: il framework è in costruzione e serve a imparare: l'API pubblica

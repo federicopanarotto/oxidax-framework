@@ -65,10 +65,11 @@ async fn reports_full_crud_cycle() {
 
     let response = app
         .clone()
-        .oneshot(json_request(
+        .oneshot(authorized_json_request(
             "PUT",
             &format!("/api/reports/{id}"),
             json!({"name": "Vendite trimestrali", "description": "Aggiornato"}),
+            &token,
         ))
         .await
         .unwrap();
@@ -84,6 +85,7 @@ async fn reports_full_crud_cycle() {
             Request::builder()
                 .method("DELETE")
                 .uri(format!("/api/reports/{id}"))
+                .header("authorization", format!("Bearer {token}"))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -102,6 +104,50 @@ async fn reports_full_crud_cycle() {
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn update_and_delete_require_authentication() {
+    let app = app().await;
+    let token = mint_access_token("550e8400-e29b-41d4-a716-446655440000").await;
+
+    let response = app
+        .clone()
+        .oneshot(authorized_json_request(
+            "POST",
+            "/api/reports",
+            json!({"name": "Vendite mensili", "description": "Report di ottobre"}),
+            &token,
+        ))
+        .await
+        .unwrap();
+    let created = json_body(response).await;
+    let id = created["id"].as_str().expect("id presente").to_string();
+
+    // Reads stay public, writes need the access token.
+    let response = app
+        .clone()
+        .oneshot(json_request(
+            "PUT",
+            &format!("/api/reports/{id}"),
+            json!({"name": "Aggiornato", "description": "desc"}),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri(format!("/api/reports/{id}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
 }
 
 #[tokio::test]

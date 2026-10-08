@@ -94,6 +94,16 @@ impl UserRepository for SurrealUserRepository {
         Ok(rows.into_iter().map(into_entity).collect())
     }
 
+    async fn find_by_role(&self, role: &str) -> AppResult<Vec<User>> {
+        let mut result = self
+            .db
+            .query("SELECT * FROM user WHERE role = $value")
+            .bind(("value", role))
+            .await?;
+        let rows: Vec<UserRow> = result.take(0)?;
+        Ok(rows.into_iter().map(into_entity).collect())
+    }
+
     async fn remove(&self, id: &str) -> AppResult<bool> {
         let deleted: Option<UserRow> = self.db.delete((TABLE, id)).await?;
         Ok(deleted.is_some())

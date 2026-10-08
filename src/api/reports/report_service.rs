@@ -9,7 +9,7 @@ use crate::api::places::place_service::PlaceService;
 use crate::api::reports::report_dto::{CreateReportDto, ReportResponse, UpdateReportDto};
 use crate::api::reports::report_entity::Report;
 use crate::api::reports::report_repository::ReportRepository;
-use crate::api::users::user_dto::UserResponse;
+use crate::api::users::user_dto::UserSummaryResponse;
 use crate::api::users::user_service::UserService;
 use crate::errors::{AppError, AppResult};
 
@@ -142,7 +142,7 @@ impl ReportService {
         }
     }
 
-    async fn creator_of(&self, report: &Report) -> AppResult<Option<UserResponse>> {
+    async fn creator_of(&self, report: &Report) -> AppResult<Option<UserSummaryResponse>> {
         match &report.user_id {
             Some(user_id) => self.users.find(user_id).await,
             None => Ok(None),

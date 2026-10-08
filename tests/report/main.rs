@@ -9,3 +9,4 @@ mod docs;
 mod places;
 mod service;
 mod support;
+mod users;

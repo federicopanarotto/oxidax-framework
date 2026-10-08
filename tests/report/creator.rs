@@ -90,8 +90,8 @@ async fn report_stores_and_returns_the_creator() {
     assert!(created.get("user_id").is_none(), "{created}");
     assert_eq!(created["created_by"]["id"], user_id.as_str());
     assert_eq!(created["created_by"]["firstname"], "Mario");
-    // The email of the creator is not public, only the profile.
-    assert!(created["created_by"]["email"].is_null(), "{created}");
+    // The email of the creator never appears in the response: only the profile.
+    assert!(created["created_by"].get("email").is_none(), "{created}");
 
     let report_id = created["id"].as_str().expect("id report").to_string();
 
@@ -113,14 +113,15 @@ async fn update_preserves_the_creator() {
     let user_id = user_id_of(&app, &token).await;
     let report_id = create_report(&app, &token).await;
 
-    // Updates other than creation stay public: whatever the caller sends,
-    // the merge can never rewrite who created the report.
+    // Updates require the token too: whatever the caller sends, the merge
+    // can never rewrite who created the report.
     let response = app
         .clone()
-        .oneshot(json_request(
+        .oneshot(authorized_json_request(
             "PUT",
             &format!("/api/reports/{report_id}"),
             json!({"name": "Aggiornato", "description": "Nuova descrizione"}),
+            &token,
         ))
         .await
         .unwrap();

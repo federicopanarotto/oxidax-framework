@@ -86,11 +86,16 @@ pub async fn get_report(
     responses(
         (status = 200, description = "Report updated", body = ReportResponse),
         (status = 400, description = "Invalid request: malformed JSON body or non-existent category", body = BadRequestResponse),
+        (status = 401, description = "Missing or invalid access token", body = ErrorResponse),
         (status = 404, description = "Report not found", body = ErrorResponse),
         (status = 422, description = "Field validation failed", body = ValidationErrorResponse),
         (status = 503, description = "Database unavailable", body = ErrorResponse),
     ),
+    security(
+        ("accessToken" = []),
+    ),
 )]
+#[IsGranted]
 pub async fn update_report(
     State(service): State<Arc<ReportService>>,
     Path(id): Path<String>,
@@ -107,10 +112,15 @@ pub async fn update_report(
     params(("id" = String, Path, description = "Report id")),
     responses(
         (status = 204, description = "Report deleted"),
+        (status = 401, description = "Missing or invalid access token", body = ErrorResponse),
         (status = 404, description = "Report not found", body = ErrorResponse),
         (status = 503, description = "Database unavailable", body = ErrorResponse),
     ),
+    security(
+        ("accessToken" = []),
+    ),
 )]
+#[IsGranted]
 pub async fn delete_report(
     State(service): State<Arc<ReportService>>,
     Path(id): Path<String>,

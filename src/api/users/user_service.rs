@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use di::injectable;
 
-use crate::api::users::user_dto::UserResponse;
+use crate::api::users::user_dto::{UserResponse, UserSummaryResponse};
 use crate::api::users::user_repository::UserRepository;
 use crate::errors::{AppError, AppResult};
 use crate::lib::auth::UserIdentityRepository;
@@ -41,28 +41,30 @@ impl UserService {
     /// Profile of a user without the email (email is only ever exposed to
     /// the owner and to admins): used by other services to nest a user in
     /// their responses without failing if the user is gone.
-    pub async fn find(&self, id: &str) -> AppResult<Option<UserResponse>> {
+    pub async fn find(&self, id: &str) -> AppResult<Option<UserSummaryResponse>> {
         Ok(self
             .users
             .find_by_id(id)
             .await?
-            .map(|user| UserResponse::new(user, None)))
+            .map(UserSummaryResponse::new))
     }
 
     /// `id → user` index: decorates a list of entities with a single read,
     /// avoiding N+1 queries per element.
-    pub async fn by_id(&self) -> AppResult<HashMap<String, UserResponse>> {
+    pub async fn by_id(&self) -> AppResult<HashMap<String, UserSummaryResponse>> {
         let mut index = HashMap::new();
         for user in self.users.find_all().await? {
-            let response = UserResponse::new(user, None);
+            let response = UserSummaryResponse::new(user);
             index.insert(response.id.clone(), response);
         }
         Ok(index)
     }
 
     /// All users with their local email, resolved through a single read of
-    /// the identities (index instead of N+1 queries).
-    pub async fn list(&self) -> AppResult<Vec<UserResponse>> {
+    /// the identities (index instead of N+1 queries). With `role` present
+    /// only the users with that role are returned (the value was already
+    /// validated by the `ValidatedQuery` extractor).
+    pub async fn list(&self, role: Option<&str>) -> AppResult<Vec<UserResponse>> {
         let emails: HashMap<String, String> = self
             .identities
             .find_all()
@@ -71,10 +73,12 @@ impl UserService {
             .map(|identity| (identity.user_id, identity.identifier))
             .collect();
 
-        Ok(self
-            .users
-            .find_all()
-            .await?
+        let users = match role {
+            Some(role) => self.users.find_by_role(role).await?,
+            None => self.users.find_all().await?,
+        };
+
+        Ok(users
             .into_iter()
             .map(|user| {
                 let email = emails.get(&user.id).cloned();
