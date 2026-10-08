@@ -231,6 +231,13 @@ Surreal) o `cargo run` (SurrealDB da `.env`). UI: http://localhost:3000/swagger-
   Dev Container.
 - Le tabelle SurrealDB 3 non nascono da sole: serve `ensure_schema` →
   `DEFINE TABLE IF NOT EXISTS ... SCHEMALESS` (helper `db::define_table`).
+- **Lo schema del DB reale lo possiede solo `ensure_schema`**: `DEFINE FIELD`
+  aggiunti a mano (console/Studio) entrano in conflitto con il codice e
+  rompono le scritture con `503 Couldn't coerce ... Expected uuid/record<> but
+  found '...'` (i test `mem://` non lo vedono perché il DB è pulito). Simptomi:
+  place/category/report non si creano, auth/user ok. Fix: `REMOVE FIELD ...`
+  (i dati restano). Verificato il 2026-10-08: 11 field manuali rimossi da
+  `test/reports`, E2E 15/15 sul DB reale.
 - `#[utoipa::path]` accetta solo funzioni libere, non metodi; quindi niente
   classi controller.
 - I custom validator di `validator` devono ritornare `Result<(), ValidationError>`.
