@@ -10,5 +10,9 @@ RUN rustup toolchain install stable --profile minimal \
 
 RUN cargo install cargo-watch --locked
 
+RUN curl -fsSL https://opencode.ai/install | bash -s -- --no-modify-path \
+    && install -m 0755 "$HOME/.opencode/bin/opencode" /usr/local/bin/opencode \
+    && rm -rf "$HOME/.opencode"
+
 RUN mkdir -p /usr/local/cargo/registry /usr/local/cargo/git /cargo-target \
     && chown -R vscode:vscode /usr/local/cargo /cargo-target
