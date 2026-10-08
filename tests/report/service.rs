@@ -54,6 +54,6 @@ async fn create_rejects_unknown_category() {
                 "{message}"
             )
         }
-        other => panic!("atteso errore di validazione, ottenuto {other:?}"),
+        other => panic!("expected a validation error, got {other:?}"),
     }
 }

@@ -18,7 +18,7 @@ pub enum DbBackend {
 }
 
 impl Config {
-    /// Configurazione con backend in-memory (test e `DB_BACKEND=memory`).
+    /// Configuration with the in-memory backend (tests and `DB_BACKEND=memory`).
     pub fn memory() -> Self {
         Self {
             db_backend: DbBackend::Memory,

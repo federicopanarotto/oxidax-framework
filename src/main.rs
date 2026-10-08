@@ -16,14 +16,14 @@ async fn main() {
 
     let app = api::router::build(&config)
         .await
-        .expect("impossibile avviare l'applicazione");
+        .expect("failed to start the application");
 
     let listener = tokio::net::TcpListener::bind(&config.server_addr)
         .await
-        .expect("impossibile ascoltare sull'indirizzo indicato");
+        .expect("failed to bind the server to the configured address");
 
     tracing::info!("listening on http://{}", config.server_addr);
-    tracing::info!("swagger su http://{}/swagger-ui", config.server_addr);
+    tracing::info!("swagger UI at http://{}/swagger-ui", config.server_addr);
 
-    axum::serve(listener, app).await.expect("server interrotto");
+    axum::serve(listener, app).await.expect("server terminated");
 }

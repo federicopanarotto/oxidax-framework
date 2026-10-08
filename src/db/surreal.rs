@@ -6,9 +6,9 @@ use surrealdb::types::{RecordIdKey, ToSql};
 use crate::config::Config;
 use crate::errors::{AppError, AppResult};
 
-/// Apre la connessione a SurrealDB e imposta il namespace/database.
+/// Opens the SurrealDB connection and sets namespace/database.
 ///
-/// La connessione è condivisa da tutti i repository dell'applicazione.
+/// The connection is shared by all the application repositories.
 pub async fn connect(url: &str, config: &Config) -> AppResult<Surreal<Any>> {
     let db = Surreal::<Any>::init();
 
@@ -33,7 +33,8 @@ pub async fn connect(url: &str, config: &Config) -> AppResult<Surreal<Any>> {
     Ok(db)
 }
 
-/// Crea la tabella se non esiste: SurrealDB 3 non crea tabelle implicitamente.
+/// Creates the table if it does not exist: SurrealDB 3 does not create
+/// tables implicitly.
 pub async fn define_table(db: &Surreal<Any>, table: &str) -> AppResult<()> {
     db.query(format!("DEFINE TABLE IF NOT EXISTS {table} SCHEMALESS"))
         .await?
@@ -41,8 +42,8 @@ pub async fn define_table(db: &Surreal<Any>, table: &str) -> AppResult<()> {
     Ok(())
 }
 
-/// Converte la chiave di un record id nel solo valore usato dall'API (`uuid`),
-/// non nel formato completo `table:uuid`.
+/// Converts a record id key to the value the API uses (`uuid`), stripping the
+/// full `table:uuid` format.
 pub fn record_key_to_string(key: RecordIdKey) -> String {
     match key {
         RecordIdKey::String(value) => value,

@@ -1,10 +1,10 @@
-//! Gestione centralizzata degli errori.
+//! Centralized error handling.
 //!
-//! Pipeline: ogni errore dell'applicazione viene normalizzato in [`AppError`]
-//! (codice macchina + stato HTTP), poi [`pipeline::respond`] lo converte nella
-//! risposta JSON uniforme con log strutturato. Gli errori di validazione dei
-//! DTO vengono gestiti invece dagli estrattori in `crate::lib` con il formato
-//! `{error, details}`.
+//! Pipeline: every application error is normalized into [`AppError`] (machine
+//! code + HTTP status), then [`pipeline::respond`] turns it into the uniform
+//! JSON response with structured logging. DTO validation errors, on the other
+//! hand, are handled by the extractors in `crate::lib` with the `{error,
+//! details}` shape.
 
 pub mod pipeline;
 pub mod response;
@@ -17,14 +17,14 @@ use utoipa::{PartialSchema, ToSchema};
 
 pub use response::ErrorResponse;
 
-/// Corpo delle risposte `400 Bad Request` dei metodi di scrittura: può essere
-/// il rifiuto degli estrattori di validazione per body/query mal formati
-/// ([`ValidationErrorResponse`], shape `{error, details}`) oppure un errore di
-/// dominio come la categoria inesistente ([`ErrorResponse`], shape
-/// `{code, error, message}`).
+/// Body of the `400 Bad Request` responses of the write methods: it can be
+/// the rejection of the validation extractors for malformed body/query
+/// ([`ValidationErrorResponse`], `{error, details}` shape) or a domain error
+/// such as a missing category ([`ErrorResponse`], `{code, error, message}`
+/// shape).
 ///
-/// È una semplice alias OpenAPI: non esiste a runtime, serve solo a
-/// documentare che il 400 può restituire uno dei due corpi (schema `oneOf`).
+/// It is a plain OpenAPI alias: it does not exist at runtime, it only
+/// documents that the 400 can return one of the two bodies (`oneOf` schema).
 pub struct BadRequestResponse {}
 
 impl PartialSchema for BadRequestResponse {
@@ -42,7 +42,7 @@ impl ToSchema for BadRequestResponse {
     }
 }
 
-/// Errore generico dell'applicazione, indipendente dal layer che lo produce.
+/// Generic application error, independent from the layer that produces it.
 #[derive(Debug, thiserror::Error)]
 pub enum AppError {
     #[error("{0}")]
@@ -58,7 +58,7 @@ pub enum AppError {
 pub type AppResult<T> = Result<T, AppError>;
 
 impl AppError {
-    /// Codice macchina stabile, esposto nel corpo della risposta.
+    /// Stable machine code, exposed in the response body.
     pub fn code(&self) -> &'static str {
         match self {
             Self::NotFound(_) => "not_found",
@@ -68,7 +68,7 @@ impl AppError {
         }
     }
 
-    /// Stato HTTP associato all'errore.
+    /// HTTP status associated with the error.
     pub fn status(&self) -> StatusCode {
         match self {
             Self::NotFound(_) => StatusCode::NOT_FOUND,

@@ -1,5 +1,17 @@
 # riepilogo
 
+## Framework zero-touch: `#[route]` + registri statici (08/10)
+- [x] **Proc-macro crate `framework-macros/`**: attributo `#[route]` su ogni handler → espande l'handler invariato + genera un builder `fn(&ServiceProvider) -> (Router, OpenApi)` (risolve il service dal provider DI via `provider.get_required::<T>()` dove `T` è estratto dal `State<Arc<T>>` della firma) + `inventory::submit!` nel registro `Route`. Verifica di compile-time: presenza `#[utoipa::path(...)]` e argomento `State<Arc<T>>`. Il codice generato usa path fully-qualified (`di::`, `axum::`, `utoipa::`, `utoipa_axum::`, `inventory::`), così gli handler non hanno bisogno di import.
+- [x] **`src/lib/registry.rs`**: registri doppi — `Feature { order, register }` (solo DI: repo + service) e `Route { build }` (una rotta per handler); due `inventory::collect!`; `register_repository` resta.
+- [x] **`features.rs`**: `provider(config)` (itera `Feature` ordinati → DI) + `route_bundles(&provider) -> Vec<(Router, OpenApi)>` (itera `Route`). **`router.rs`**: niente più `nest("/api")` — ogni `#[route]` monta path assoluti (`/api/reports` ecc.) dichiarati in `#[utoipa::path]`; merge generico + health + swagger + fallback.
+- [x] **Controller ripuliti**: `build_router` eliminato (prima l'obbiettivo era "solo la route table"), ogni handler = `#[route]` sopra `#[utoipa::path(...)]`; stato e OpenAPI auto-generati. **`mod.rs` delle feature**: solo wiring DI + `inventory::submit! { Feature::new(order, register) }` (categories 0, reports 1).
+- [x] **Facade `src/framework.rs`**: `pub use` di registri, `route`, estrattori di validazione, contratto errori → `use crate::framework::*;`. Usata già in feature e `mod.rs`. Doctest incluso (verifica l'import).
+- [x] **Tutti i commenti tradotti in inglese** (richiesta esplicita): `config`, `db`, `errors`, `lib`, `api`, `tests`; le stringhe user-facing (messaggi di validazione, `description = "..."` in utoipa, esempi schema) restano in italiano.
+- [x] **`README.md` creato** (in italiano): progetto di prova per un framework personale, filosofia "usare le crate esistenti" (axum, utoipa+utoipa-axum, validator, more-di, inventory, SurrealDB), guida "come nasce una feature", contratto errori, avvio, test, stato/reprossimi passi.
+- [x] Verifiche: `cargo check --all-targets` ✓; `cargo test` **13/13** + 1 doctest facade ✓; `cargo clippy --all-targets -- -D warnings` ✓; `cargo fmt --check` ✓.
+- Nota: l'errore di rust-analyzer su Windows (`expected (), found ({unknown}, {unknown}, {unknown})` su `routes!`) è un limite dell'host (non vede le crate del container): il codice compila; per RA senza falsi errori aprire la cartella nel Dev Container.
+- **Server fermato** (su richiesta: l'utente ha ripreso il controllo della porta 3000; processo terminato con `pkill` nel container).
+
 ## Refactor validazione + controller (07/10 sera)
 - [x] **Libreria di validazione propria `src/lib/`** (montata con `#[path = "lib/mod.rs"]` in `src/lib.rs` per evitare collisione col crate root): estrattori axum `ValidatedJson`/`ValidatedQuery`/`ValidatedParams` (`T: DeserializeOwned + Send + Validate`) che validano via `validator::Validate` e rispondono 400/422 uniformi `{error, details}`; `ValidationErrorResponse` ToSchema (`#[schema(example=...)]` solo su `error`, non su `details`); helper `format_validation_errors`, `not_blank`, `validate_uuid`.
 - [x] **Validazione sui DTO** con `validator 0.20`: `#[derive(Validate)]` + decoratori `custom(not_blank)` e `length(max=...)` su name/description; `validate_uuid` su `category_id` (Option): il formato id viene verificato a livello DTO, non più nel service.
@@ -37,11 +49,13 @@
 - Container DI manuale `src/di.rs` (era verde 13/13 ma giudicato "boilerplate" dall'utente) → sostituito da more-di; `src/di.rs` eliminato, `pub mod di;` rimosso da `src/lib.rs`.
 
 ## Note per l'utente
-- Server attivo col nuovo binario su porta 3000: http://localhost:3000/swagger-ui (UI Swagger; la spec è servita live su `/api-docs/openapi.json`, non più esportata su file).
+- **Permessi `/cargo-target`**: il container da VS Code compila come utente `vscode`; ogni comando cargo da terminale host va eseguito con `docker exec -u vscode -w /workspace axum-api_devcontainer-app-1 cargo ...`. Se si lancia cargo come root (`docker exec` senza `-u`) coesistono due proprietari sul volume condiviso e VS Code fallisce con `Permission denied (os error 13)` sui `.fingerprint`. Fix applicato: `chown -R vscode:vscode /cargo-target`.
+- Server **non più in esecuzione** (stoppato per consegna del controllo); per riavviarlo: `docker exec -w /workspace axum-api_devcontainer-app-1 sh -c "/cargo-target/debug/axum-api > /tmp/app.log 2>&1 &"` oppure `DB_BACKEND=memory cargo run` e aprire http://localhost:3000/swagger-ui (UI Swagger; la spec è servita live su `/api-docs/openapi.json`, non esportata su file).
 - SurrealDB `root/root` su localhost:8000; in dev usare `cargo run` con DB backend Surreal (default) o `DB_BACKEND=memory`.
 
 ## Prossimi passi possibili
-- **Framework minimale "definisci le route e basta"** (richiesto, scelte fatte): DSL `routes! {}` per-feature + middleware chain (stile Express), auto-registrazione scouting nel container DI (`#[injectable]`), **discovery zero-touch** delle feature via registry statico (`inventory`) così `features.rs`/`router.rs` non si toccano più. Da implementare.
-- Committare la feature (non fatto: serve richiesta esplicita).
-- Eventuale endpoint di health che includa lo stato del DB/uscite esplicite.
-- Test e2e HTTP su backend Surreal (le verifiche finora sono state solo `memory`).
+- **Vertical slicing "come aggiungere una feature"** (ora zero-touch: solo `mod` + handler `#[route]` + `Feature::new` nel `mod.rs`; i file di wiring non si toccano). Da documentare anche in README con un esempio completo end-to-end.
+- Middleware **chain "stile Express"** (logging, auth) come layer applicabili globalmente o per-feature.
+- Paginazione/ordinamento e altre utility condivise da riusare tra le feature.
+- Committare (non fatto: serve richiesta esplicita).
+- Test e2e HTTP su backend Surreal (finora solo `memory`).

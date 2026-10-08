@@ -1,16 +1,16 @@
 use serde::Serialize;
 use utoipa::ToSchema;
 
-/// Corpo JSON uniforme di tutti gli errori dell'API.
+/// Uniform JSON body of every API error.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct ErrorResponse {
-    /// Codice macchina dell'errore
+    /// Machine code of the error
     #[schema(example = "not_found")]
     pub code: String,
-    /// Stato HTTP
+    /// HTTP status
     #[schema(example = "404 Not Found")]
     pub error: String,
-    /// Messaggio leggibile
+    /// Human-readable message
     #[schema(example = "report 550e8400... not found")]
     pub message: String,
 }

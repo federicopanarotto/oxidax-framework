@@ -1,44 +1,32 @@
 use std::sync::Arc;
 
 use axum::Json;
-use axum::Router;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
-use utoipa::openapi::OpenApi;
-use utoipa_axum::router::OpenApiRouter;
-use utoipa_axum::routes;
 
 use crate::api::categories::category_dto::{
     CategoryResponse, CreateCategoryDto, UpdateCategoryDto,
 };
 use crate::api::categories::category_service::CategoryService;
 use crate::errors::{AppResult, BadRequestResponse, ErrorResponse};
-use crate::lib::{ValidatedJson, ValidationErrorResponse};
+use crate::framework::{ValidatedJson, ValidationErrorResponse, route};
 
-/// Route table (axum) and OpenAPI spec for categories, defined right here,
-/// without an object controller: the handlers are `#[utoipa::path]`
-/// functions that use [`CategoryService`] as state.
-///
-/// Registration in the DI container and in the feature registry (`order` 0)
-/// live in `mod.rs`, so `features.rs`/`router.rs`/`docs.rs` never change.
-pub fn build_router(service: Arc<CategoryService>) -> (Router, OpenApi) {
-    OpenApiRouter::new()
-        .routes(routes!(create_category, list_categories))
-        .routes(routes!(get_category, update_category, delete_category))
-        .with_state(service)
-        .split_for_parts()
-}
+// Route table and OpenAPI spec of the categories, defined point-inline: every
+// handler is annotated with `#[utoipa::path(...)]` (HTTP method, path and
+// responses) and `#[route]`, which self-registers it in the static registry.
+// `features.rs`/`router.rs`/`docs.rs` never change when a handler is added.
 
+#[route]
 #[utoipa::path(
     post,
     path = "/api/categories",
     tag = "categories",
     request_body = CreateCategoryDto,
     responses(
-        (status = 201, description = "Categoria creata con successo", body = CategoryResponse),
-        (status = 400, description = "Richiesta non valida: body JSON malformato", body = BadRequestResponse),
-        (status = 422, description = "Validazione dei campi non superata", body = ValidationErrorResponse),
-        (status = 503, description = "Database non disponibile", body = ErrorResponse),
+        (status = 201, description = "Category created successfully", body = CategoryResponse),
+        (status = 400, description = "Invalid request: malformed JSON body", body = BadRequestResponse),
+        (status = 422, description = "Field validation failed", body = ValidationErrorResponse),
+        (status = 503, description = "Database unavailable", body = ErrorResponse),
     ),
 )]
 pub async fn create_category(
@@ -49,13 +37,14 @@ pub async fn create_category(
     Ok((StatusCode::CREATED, Json(created)))
 }
 
+#[route]
 #[utoipa::path(
     get,
     path = "/api/categories",
     tag = "categories",
     responses(
-        (status = 200, description = "Elenco delle categorie", body = [CategoryResponse]),
-        (status = 503, description = "Database non disponibile", body = ErrorResponse),
+        (status = 200, description = "List of categories", body = [CategoryResponse]),
+        (status = 503, description = "Database unavailable", body = ErrorResponse),
     ),
 )]
 pub async fn list_categories(
@@ -64,15 +53,16 @@ pub async fn list_categories(
     Ok(Json(service.list().await?))
 }
 
+#[route]
 #[utoipa::path(
     get,
     path = "/api/categories/{id}",
     tag = "categories",
-    params(("id" = String, Path, description = "Id della categoria")),
+    params(("id" = String, Path, description = "Category id")),
     responses(
-        (status = 200, description = "Categoria trovata", body = CategoryResponse),
-        (status = 404, description = "Categoria non trovata", body = ErrorResponse),
-        (status = 503, description = "Database non disponibile", body = ErrorResponse),
+        (status = 200, description = "Category found", body = CategoryResponse),
+        (status = 404, description = "Category not found", body = ErrorResponse),
+        (status = 503, description = "Database unavailable", body = ErrorResponse),
     ),
 )]
 pub async fn get_category(
@@ -82,18 +72,19 @@ pub async fn get_category(
     Ok(Json(service.get(&id).await?))
 }
 
+#[route]
 #[utoipa::path(
     put,
     path = "/api/categories/{id}",
     tag = "categories",
-    params(("id" = String, Path, description = "Id della categoria")),
+    params(("id" = String, Path, description = "Category id")),
     request_body = UpdateCategoryDto,
     responses(
-        (status = 200, description = "Categoria aggiornata", body = CategoryResponse),
-        (status = 400, description = "Richiesta non valida: body JSON malformato", body = BadRequestResponse),
-        (status = 404, description = "Categoria non trovata", body = ErrorResponse),
-        (status = 422, description = "Validazione dei campi non superata", body = ValidationErrorResponse),
-        (status = 503, description = "Database non disponibile", body = ErrorResponse),
+        (status = 200, description = "Category updated", body = CategoryResponse),
+        (status = 400, description = "Invalid request: malformed JSON body", body = BadRequestResponse),
+        (status = 404, description = "Category not found", body = ErrorResponse),
+        (status = 422, description = "Field validation failed", body = ValidationErrorResponse),
+        (status = 503, description = "Database unavailable", body = ErrorResponse),
     ),
 )]
 pub async fn update_category(
@@ -104,15 +95,16 @@ pub async fn update_category(
     Ok(Json(service.update(&id, dto).await?))
 }
 
+#[route]
 #[utoipa::path(
     delete,
     path = "/api/categories/{id}",
     tag = "categories",
-    params(("id" = String, Path, description = "Id della categoria")),
+    params(("id" = String, Path, description = "Category id")),
     responses(
-        (status = 204, description = "Categoria eliminata"),
-        (status = 404, description = "Categoria non trovata", body = ErrorResponse),
-        (status = 503, description = "Database non disponibile", body = ErrorResponse),
+        (status = 204, description = "Category deleted"),
+        (status = 404, description = "Category not found", body = ErrorResponse),
+        (status = 503, description = "Database unavailable", body = ErrorResponse),
     ),
 )]
 pub async fn delete_category(

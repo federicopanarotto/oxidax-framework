@@ -117,7 +117,7 @@ async fn create_without_name_returns_422() {
 
     assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
     let body = json_body(response).await;
-    assert_eq!(body["error"], "Errore di validazione del Body");
+    assert_eq!(body["error"], "Validation error on Body");
     let details = body["details"].as_array().expect("details come lista");
     assert!(
         details.iter().any(|d| d.as_str().unwrap().contains("name")),
@@ -143,7 +143,7 @@ async fn malformed_json_returns_400_with_details() {
 
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     let body = json_body(response).await;
-    assert_eq!(body["error"], "Body JSON non valido o malformato");
+    assert_eq!(body["error"], "Body JSON is invalid or malformed");
     let details = body["details"].as_array().expect("details come lista");
     assert!(!details.is_empty());
 }

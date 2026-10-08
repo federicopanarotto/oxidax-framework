@@ -1,9 +1,9 @@
-//! Pipeline di conversione degli errori in risposte HTTP.
+//! Pipeline that turns errors into HTTP responses.
 //!
-//! Fase 1: [`respond`] mappa l'errore sullo stato HTTP, lo logga e lo
-//! serializza nel corpo JSON uniforme.
-//! Fase 2: il fallback [`route_not_found`] usa la stessa pipeline per le
-//! rotte inesistenti.
+//! Step 1: [`respond`] maps the error to its HTTP status, logs it and
+//! serializes it into the uniform JSON body.
+//! Step 2: the [`route_not_found`] fallback uses the same pipeline for unknown
+//! routes.
 
 use axum::Json;
 use axum::http::Uri;
@@ -13,7 +13,7 @@ use tracing::{error, warn};
 use super::AppError;
 use super::response::ErrorResponse;
 
-/// Converte un [`AppError`] nella risposta HTTP finale.
+/// Converts an [`AppError`] into the final HTTP response.
 pub fn respond(error: AppError) -> Response {
     let status = error.status();
     let body = ErrorResponse {
@@ -27,22 +27,22 @@ pub fn respond(error: AppError) -> Response {
             code = %body.code,
             status = %status,
             message = %body.message,
-            "errore interno"
+            "internal error"
         );
     } else {
         warn!(
             code = %body.code,
             status = %status,
             message = %body.message,
-            "richiesta rifiutata"
+            "request rejected"
         );
     }
 
     (status, Json(body)).into_response()
 }
 
-/// Handler di fallback: qualsiasi rotta sconosciuta produce lo stesso
-/// formato di errore degli altri endpoint.
+/// Fallback handler: any unknown route produces the same error shape as the
+/// other endpoints.
 pub async fn route_not_found(uri: Uri) -> Response {
     respond(AppError::NotFound(format!(
         "route {} not found",

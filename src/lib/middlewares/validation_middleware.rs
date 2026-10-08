@@ -23,7 +23,7 @@ use crate::lib::validators::format_validation_errors;
 #[derive(Debug, Serialize, ToSchema)]
 pub struct ValidationErrorResponse {
     /// Description of the error (body/query/params)
-    #[schema(example = "Errore di validazione del Body")]
+    #[schema(example = "Validation error on body")]
     pub error: String,
     /// Details for each field (`field: message`)
     pub details: Vec<String>,
@@ -49,7 +49,7 @@ where
         let Json(data) = Json::<T>::from_request(req, state).await.map_err(|err| {
             error_response(
                 StatusCode::BAD_REQUEST,
-                "Body JSON non valido o malformato",
+                "Body JSON is invalid or malformed",
                 vec![err.to_string()],
             )
         })?;
@@ -75,7 +75,7 @@ where
             .map_err(|err| {
                 error_response(
                     StatusCode::BAD_REQUEST,
-                    "Query Parameters non validi",
+                    "Query parameters are invalid",
                     vec![err.to_string()],
                 )
             })?;
@@ -101,7 +101,7 @@ where
             .map_err(|err| {
                 error_response(
                     StatusCode::BAD_REQUEST,
-                    "Parametri di path non validi",
+                    "Path parameters are invalid",
                     vec![err.to_string()],
                 )
             })?;
@@ -117,7 +117,7 @@ where
 fn validation_error_response(source: &str, errors: validator::ValidationErrors) -> Response {
     error_response(
         StatusCode::UNPROCESSABLE_ENTITY,
-        format!("Errore di validazione del {source}"),
+        format!("Validation error on {source}"),
         format_validation_errors(errors),
     )
 }

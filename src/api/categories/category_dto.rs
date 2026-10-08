@@ -12,9 +12,9 @@ pub struct CreateCategoryDto {
     #[validate(
         custom(
             function = "crate::lib::validators::not_blank",
-            message = "Il nome è obbligatorio e non può essere vuoto"
+            message = "The name is required and cannot be empty"
         ),
-        length(max = 200, message = "Il nome deve essere di massimo 200 caratteri")
+        length(max = 200, message = "The name must be at most 200 characters")
     )]
     pub name: String,
 }
@@ -38,9 +38,9 @@ pub struct UpdateCategoryDto {
     #[validate(
         custom(
             function = "crate::lib::validators::not_blank",
-            message = "Il nome è obbligatorio e non può essere vuoto"
+            message = "The name is required and cannot be empty"
         ),
-        length(max = 200, message = "Il nome deve essere di massimo 200 caratteri")
+        length(max = 200, message = "The name must be at most 200 characters")
     )]
     pub name: String,
 }

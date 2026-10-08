@@ -14,17 +14,17 @@ use crate::errors::AppResult;
 
 pub use surreal::{define_table, record_key_to_string};
 
-/// Tutti i repository dell'applicazione, costruiti sulla stessa connessione.
+/// All the application repositories, built on the same connection.
 pub struct Repositories {
     pub reports: Arc<dyn ReportRepository>,
     pub categories: Arc<dyn CategoryRepository>,
 }
 
-/// Crea i repository in base al backend configurato.
+/// Creates the repositories based on the configured backend.
 ///
-/// Cambiare database significa implementare i trait `ReportRepository` e
-/// `CategoryRepository` e introdurre un nuovo branch qui: il resto
-/// dell'applicazione (service, controller) non cambia.
+/// Switching database means implementing the `ReportRepository` and
+/// `CategoryRepository` traits and adding a new branch here: the rest of the
+/// application (services, controllers) does not change.
 pub async fn repositories(config: &Config) -> AppResult<Repositories> {
     let url = match config.db_backend {
         DbBackend::Memory => "mem://",
@@ -34,8 +34,8 @@ pub async fn repositories(config: &Config) -> AppResult<Repositories> {
     from_connection(surreal::connect(url, config).await?).await
 }
 
-/// Repository embedded in-memory (SurrealDB `mem://`): usato dai test e
-/// disponibile a runtime con `DB_BACKEND=memory`.
+/// Embedded in-memory repositories (SurrealDB `mem://`): used by the tests and
+/// available at runtime with `DB_BACKEND=memory`.
 pub async fn memory_repositories() -> AppResult<Repositories> {
     repositories(&Config::memory()).await
 }

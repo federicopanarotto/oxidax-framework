@@ -167,7 +167,7 @@ async fn category_rejects_blank_name() {
 
     assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
     let body = json_body(response).await;
-    assert_eq!(body["error"], "Errore di validazione del Body");
+    assert_eq!(body["error"], "Validation error on Body");
     let details = body["details"].as_array().expect("details come lista");
     assert!(
         details.iter().any(|d| d.as_str().unwrap().contains("name")),

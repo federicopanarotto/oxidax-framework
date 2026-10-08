@@ -13,9 +13,9 @@ pub struct CreateReportDto {
     #[validate(
         custom(
             function = "crate::lib::validators::not_blank",
-            message = "Il nome è obbligatorio e non può essere vuoto"
+            message = "The name is required and cannot be empty"
         ),
-        length(max = 200, message = "Il nome deve essere di massimo 200 caratteri")
+        length(max = 200, message = "The name must be at most 200 characters")
     )]
     pub name: String,
     /// Report description
@@ -27,11 +27,11 @@ pub struct CreateReportDto {
     #[validate(
         custom(
             function = "crate::lib::validators::not_blank",
-            message = "La descrizione è obbligatoria e non può essere vuota"
+            message = "The description is required and cannot be empty"
         ),
         length(
             max = 2000,
-            message = "La descrizione deve essere di massimo 2000 caratteri"
+            message = "The description must be at most 2000 characters"
         )
     )]
     pub description: String,
@@ -39,7 +39,7 @@ pub struct CreateReportDto {
     #[schema(example = "550e8400-e29b-41d4-a716-446655440000")]
     #[validate(custom(
         function = "crate::lib::validators::validate_uuid",
-        message = "L'id della categoria deve essere un UUID valido"
+        message = "The category id must be a valid UUID"
     ))]
     pub category_id: Option<String>,
 }
@@ -65,9 +65,9 @@ pub struct UpdateReportDto {
     #[validate(
         custom(
             function = "crate::lib::validators::not_blank",
-            message = "Il nome è obbligatorio e non può essere vuoto"
+            message = "The name is required and cannot be empty"
         ),
-        length(max = 200, message = "Il nome deve essere di massimo 200 caratteri")
+        length(max = 200, message = "The name must be at most 200 characters")
     )]
     pub name: String,
     /// New report description
@@ -79,11 +79,11 @@ pub struct UpdateReportDto {
     #[validate(
         custom(
             function = "crate::lib::validators::not_blank",
-            message = "La descrizione è obbligatoria e non può essere vuota"
+            message = "The description is required and cannot be empty"
         ),
         length(
             max = 2000,
-            message = "La descrizione deve essere di massimo 2000 caratteri"
+            message = "The description must be at most 2000 characters"
         )
     )]
     pub description: String,
@@ -91,7 +91,7 @@ pub struct UpdateReportDto {
     #[schema(example = "550e8400-e29b-41d4-a716-446655440000")]
     #[validate(custom(
         function = "crate::lib::validators::validate_uuid",
-        message = "L'id della categoria deve essere un UUID valido"
+        message = "The category id must be a valid UUID"
     ))]
     pub category_id: Option<String>,
 }
@@ -121,9 +121,6 @@ pub struct ReportResponse {
     /// Report description
     #[schema(example = "Report sulle vendite del mese corrente")]
     pub description: String,
-    /// Id of the associated category (optional)
-    #[schema(example = "550e8400-e29b-41d4-a716-446655440000")]
-    pub category_id: Option<String>,
     /// Associated category (full object, present only if the relationship exists)
     pub category: Option<CategoryResponse>,
 }
@@ -144,7 +141,6 @@ impl
             id: report.id,
             name: report.name,
             description: report.description,
-            category_id: report.category_id,
             category,
         }
     }
