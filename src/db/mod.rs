@@ -11,8 +11,11 @@ use crate::api::places::place_repository::PlaceRepository;
 use crate::api::places::surreal_place_repository::SurrealPlaceRepository;
 use crate::api::reports::report_repository::ReportRepository;
 use crate::api::reports::surreal_report_repository::SurrealReportRepository;
+use crate::api::users::surreal_user_repository::SurrealUserRepository;
+use crate::api::users::user_repository::UserRepository;
 use crate::config::{Config, DbBackend};
 use crate::errors::AppResult;
+use crate::lib::auth::{SurrealUserIdentityRepository, UserIdentityRepository};
 
 pub use surreal::{define_table, record_key_to_string};
 
@@ -21,6 +24,8 @@ pub struct Repositories {
     pub reports: Arc<dyn ReportRepository>,
     pub categories: Arc<dyn CategoryRepository>,
     pub places: Arc<dyn PlaceRepository>,
+    pub users: Arc<dyn UserRepository>,
+    pub user_identities: Arc<dyn UserIdentityRepository>,
 }
 
 /// Creates the repositories based on the configured backend.
@@ -50,12 +55,20 @@ async fn from_connection(db: Surreal<Any>) -> AppResult<Repositories> {
     let categories = SurrealCategoryRepository::new(db.clone());
     categories.ensure_schema().await?;
 
-    let places = SurrealPlaceRepository::new(db);
+    let places = SurrealPlaceRepository::new(db.clone());
     places.ensure_schema().await?;
+
+    let users = SurrealUserRepository::new(db.clone());
+    users.ensure_schema().await?;
+
+    let user_identities = SurrealUserIdentityRepository::new(db);
+    user_identities.ensure_schema().await?;
 
     Ok(Repositories {
         reports: Arc::new(reports),
         categories: Arc::new(categories),
         places: Arc::new(places),
+        users: Arc::new(users),
+        user_identities: Arc::new(user_identities),
     })
 }

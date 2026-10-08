@@ -5,10 +5,12 @@
 //! *before* the controller logic) and the shared validators to be reused in
 //! every feature.
 
+pub mod auth;
 pub mod middlewares;
 pub mod registry;
 pub mod validators;
 
+pub use auth::{CurrentUser, JwtConfig};
 pub use middlewares::validation_middleware::{
     ValidatedJson, ValidatedParams, ValidatedQuery, ValidationErrorResponse,
 };

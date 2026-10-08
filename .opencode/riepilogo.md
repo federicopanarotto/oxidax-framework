@@ -25,6 +25,7 @@
 | Validazione   | `validator 0.21` (derive)                                  |
 | DI            | `more-di 3` (feature `async` → `Ref<T> = Arc<T>`)          |
 | DB            | `surrealdb 3.3` (`mem://` nei test)                        |
+| Auth          | `jsonwebtoken 11` (HS256) + `argon2 0.5` (Argon2id)         |
 | Errori        | `thiserror 2` + pipeline unificata                         |
 | Log           | `tracing` + `tracing-subscriber`                           |
 | Config        | `dotenvy 0.15` + variabili d'ambiente                      |
@@ -40,6 +41,8 @@ src/
 ├── lib/               # "core" del framework
 │   ├── registry.rs    # registri statici Feature (DI) e Route + register_repository
 │   ├── validators.rs  # format_validation_errors, not_blank, validate_uuid
+│   ├── auth/          # auth core (ordine 0): jwt, password, user_identity,
+│   │                   #   identity_repository (trait + surreal), extractor, guard, mod
 │   └── middlewares/
 │       ├── validation_middleware.rs  # ValidatedJson/Query/Params + ValidationErrorResponse
 │       └── access_log.rs             # log richieste "POST /api/x 200 3ms"
@@ -50,11 +53,14 @@ src/
     ├── features.rs    # GENERICO: provider(config) + route_bundles(&provider)
     ├── router.rs      # GENERICO: merge rotte + health + swagger + fallback + access_log
     ├── docs.rs        # GENERICO: build OpenApi da frammenti + swagger_router
+    │                  #   + scheme accessToken/refreshToken (HTTP bearer JWT, unica modifica one-time)
     ├── categories/    # feature: entity, dto, repository, surreal_*, service, controller, mod
     ├── places/        # feature: city, address, cap, provenance
-    └── reports/       # feature: dipende da categories e places
-framework-macros/      # proc-macro #[route]
-tests/report/          # integration test HTTP reali (backend mem://)
+    ├── reports/       # feature: dipende da categories e places
+    ├── users/         # feature (order 3): /api/users/me, /api/users (admin)
+    └── auth/          # feature (order 4): register/login/refresh/logout
+framework-macros/      # proc-macro #[route] (consuma #[IsGranted])
+tests/report/          # integration test HTTP reali (backend mem://), auth.rs incluso
 ADD-FEATURE.md         # guida: come aggiungere una feature (esempio Places)
 ```
 
@@ -81,13 +87,42 @@ ADD-FEATURE.md         # guida: come aggiungere una feature (esempio Places)
   `services.add(XService::singleton())`.
 - `#[injectable]` (more-di) genera il costruttore; i campi sono `Arc<...>`.
   Serve `use di::Injectable;` per `.singleton()`.
-- **Order attuale**: categories = 0, places = 1, reports = 2 (dipendenze prima).
-  L'iniezione è lazy, quindi l'ordine è una cintura di sicurezza.
+- **Order attuale**: categories = 0, places = 1, reports = 2, users = 3,
+  auth = 4 (dipendenze prima); `lib/auth` core = ordine 0 (registra identity
+  repo + `JwtConfig` lazy da `Arc<Config>`). L'iniezione è lazy, quindi
+  l'ordine è una cintura di sicurezza.
 
 ### Flusso di una richiesta
-`access_log` → router axum → extractor (`State`/`ValidatedJson`) → handler →
+`access_log` → router axum → (rotte con `#[IsGranted]`: guard bearer → estende
+`CurrentUser`) → extractor (`State`/`ValidatedJson`) → handler →
 service → repository → SurrealDB. Errori e validazione risalgono come `AppError`
 o `ValidationErrorResponse`.
+
+### Autenticazione (JWT)
+- `src/lib/auth/` è il "core" (feature order 0): **non** dipende dalle feature
+  users/auth (niente coupling feature↔feature); registra `UserIdentityRepository`
+  e `JwtConfig` (lazy da `Arc<Config>`: `JWT_SECRET`, `ACCESS_TOKEN_DURATION`,
+  `REFRESH_TOKEN_DURATION`).
+- Token: access breve + refresh lungo e **monouso** (jti in
+  `user_identity.refresh_jti`; rotazione a ogni refresh, `clear_refresh` al
+  logout → 401). `verify_*` usa `jsonwebtoken` (default `leeway: 60`,
+  `validate_exp: true`).
+- Password: argon2 (`hash`/`verify` fail-closed) in `lib/auth/password.rs`.
+- `#[IsGranted]` / `#[IsGranted(["admin"])]` va **sotto** `#[route]`: la macro
+  aggiunge il layer guard sulla singola rotta (`from_fn_with_state`) e fa
+  shadow di `__router`; senza attributo la rotta è pubblica e non dipende da
+  `JwtConfig`. Guard → `401`/`403`, poi estende `CurrentUser`
+  (`user_id`, `identity_id`, `role`), estrattore in `framework`.
+- Tabelle: `user` (ruoli `ROLE_USER`/`ROLE_ADMIN`) + `user_identity`
+  (provider/identifier/password_hash + refresh jti/exp). Admin creato a mano
+  sul DB (register forza `role = user`).
+- Errori generici anti-enumeration: login 401 identico per email ignota o
+  password sbagliata; register duplicato `409 registration could not be
+  completed`; refresh `401 invalid or expired refresh token`.
+- Register su 2 tabelle non transazionale → compensazione manuale (rimuove
+  l'utente se fallisce l'identity, `tracing::warn` se fallisce il rollback).
+- Swagger: scheme `accessToken`/`refreshToken` (`utoipa::Modify` in `docs.rs`,
+  HTTP bearer JWT); ogni handler protetto dichiara `security(...)` e 401/403.
 
 ### Contratto errori
 - Dominio/pipeline: `{code, error, message}` con status giusto
@@ -116,18 +151,22 @@ o `ValidationErrorResponse`.
   vincono) e legge **tutte** le variabili **senza default** (helper `required`
   → panico esplicito se manca).
 - Variabili: `SERVER_ADDR`, `DB_BACKEND` (`surreal` | `memory`), `SURREAL_URL`,
-  `SURREAL_NS`, `SURREAL_DB`, `SURREAL_USER`, `SURREAL_PASS`.
+  `SURREAL_NS`, `SURREAL_DB`, `SURREAL_USER`, `SURREAL_PASS`, `JWT_SECRET`,
+  `ACCESS_TOKEN_DURATION` (900), `REFRESH_TOKEN_DURATION` (604800).
 - `.env` è git-ignorato; `.env.example` è il template. `main.rs` carica il dotenv
   **prima** del setup tracing (così `RUST_LOG` dal file vale).
 - `Config::memory()` usa il backend memory (test) ma legge il resto dall'ambiente.
 
 ## Feature e modello dati
 
-| Feature    | Order | Tabella     | Note                                                        |
-| ---------- | ----- | ----------- | ----------------------------------------------------------- |
-| categories | 0     | `category`  | CRUD `/api/categories`                                       |
-| places     | 1     | `place`     | CRUD `/api/places` (city, address, cap, provenance)         |
-| reports    | 2     | `report`    | CRUD `/api/reports`; relazioni con categories e places      |
+| Feature    | Order | Tabella          | Note                                                        |
+| ---------- | ----- | ---------------- | ----------------------------------------------------------- |
+| (auth core)| 0     | `user_identity`  | `src/lib/auth`: JWT, password, guard, `CurrentUser`          |
+| categories | 0     | `category`       | CRUD `/api/categories`                                       |
+| places     | 1     | `place`          | CRUD `/api/places` (city, address, cap, provenance)         |
+| reports    | 2     | `report`         | CRUD `/api/reports`; relazioni con categories e places      |
+| users      | 3     | `user`           | `GET /api/users/me`, `GET /api/users` (solo admin)          |
+| auth       | 4     | —                | register/login/refresh/logout (`/api/auth/*`)                |
 
 - `Report` (entity) ha `category_id: Option<String>` e `place_id: Option<String>`.
 - In **risposta** NON si espongono gli `*_id`: solo gli oggetti annidati
@@ -149,14 +188,22 @@ o `ValidationErrorResponse`.
 5. `#[route]` sempre **sopra** `#[utoipa::path]`; handler con `State<Arc<T>>`.
 6. Path assoluti negli attributi utoipa; niente `nest("/api")`.
 7. Niente export di `openapi.json`; solo UI live.
+8. Rotte protette: `#[IsGranted]` **sotto** `#[route]` e sotto
+   `#[utoipa::path]`; handler protetti con estrattore `CurrentUser`; in
+   `utoipa::path` `security(...)` + 401/403 documentati.
+9. Auth: email = identifier; risposte generiche per login/register (no
+   enumerazione); refresh monouso.
 
 ## Stato e verifica
 
-- **Test**: 17 integration (HTTP reali, backend `mem://`) + 1 doctest (facade).
+- **Test**: 30 integration (HTTP reali, backend `mem://`, 13 in `auth.rs`) +
+  1 doctest (facade).
 - `cargo clippy --all-targets -- -D warnings` e `cargo fmt` puliti.
-- `git`: branch `main`, working tree **pulito**. Ultimo commit
+- `git`: branch `main`, working tree **non pulito** (feature auth + users +
+  doc da committare). Ultimo commit
   `72bff5e feat: add places feature with CRUD operations and integration with reports`.
 - **Server fermo** (porta 3000 libera).
+- **Non committare senza richiesta esplicita dell'utente.**
 
 ## Comandi (dev container)
 
@@ -200,10 +247,11 @@ Surreal) o `cargo run` (SurrealDB da `.env`). UI: http://localhost:3000/swagger-
 
 ## Backlog
 
-- Middleware "stile Express" (auth, ecc.) globali o per-feature.
 - Paginazione/ordinamento e utility condivise tra feature.
 - Eventuale rendering della relazione tramite `oneOf`/`$ref` più ricco in OpenAPI.
 - Eventuale `db/mod.rs` zero-touch (registro dinamico dei repository) per togliere
   l'ultima modifica manuale condivisa.
 - Test e2e su backend Surreal reale (oggi coperto solo `mem://`).
+- Eventuali altri middleware "stile Express" oltre all'access log e al guard
+  per-rotta (es. rate limiting).
 - Committare solo su richiesta esplicita.

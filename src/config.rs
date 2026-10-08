@@ -9,6 +9,12 @@ pub struct Config {
     pub surreal_db: String,
     pub surreal_user: String,
     pub surreal_pass: String,
+    /// Secret used to sign the JWTs.
+    pub jwt_secret: String,
+    /// Lifetime in seconds of an access token.
+    pub access_token_duration: u64,
+    /// Lifetime in seconds of a refresh token.
+    pub refresh_token_duration: u64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -45,8 +51,19 @@ impl Config {
             surreal_db: required("SURREAL_DB"),
             surreal_user: required("SURREAL_USER"),
             surreal_pass: required("SURREAL_PASS"),
+            jwt_secret: required("JWT_SECRET"),
+            access_token_duration: required_duration("ACCESS_TOKEN_DURATION"),
+            refresh_token_duration: required_duration("REFRESH_TOKEN_DURATION"),
         }
     }
+}
+
+/// Reads a mandatory environment variable holding a duration in seconds.
+fn required_duration(key: &str) -> u64 {
+    let raw = required(key);
+    raw.parse().unwrap_or_else(|_| {
+        panic!("environment variable `{key}` must be a positive number of seconds")
+    })
 }
 
 /// Reads a mandatory environment variable: configuration is never hardcoded in

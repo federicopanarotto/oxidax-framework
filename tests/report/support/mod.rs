@@ -27,6 +27,27 @@ pub async fn app() -> Router {
         .expect("applicazione")
 }
 
+/// App and its DI provider sharing the same in-memory database.
+///
+/// Required when a test must write directly to the database (e.g. the first
+/// admin, which has no endpoint) and then call the API over HTTP: the two
+/// `mem://` connections would otherwise be two separate databases.
+pub async fn app_and_provider() -> (Router, di::ServiceProvider) {
+    let provider = api::features::provider(&Config::memory())
+        .await
+        .expect("provider");
+    let bundles = api::features::route_bundles(&provider);
+    let (routers, route_apis): (Vec<_>, Vec<_>) = bundles.into_iter().unzip();
+
+    let mut router = Router::new();
+    for route in routers {
+        router = router.merge(route);
+    }
+    router = router.merge(api::docs::swagger_router(api::docs::build(route_apis)));
+
+    (router, provider)
+}
+
 /// Reads the response body as JSON.
 pub async fn json_body(response: axum::response::Response) -> Value {
     let bytes = to_bytes(response.into_body(), usize::MAX).await.unwrap();

@@ -7,9 +7,12 @@
 //! `inventory::submit!` for the DI part: `features.rs`, `router.rs` and
 //! `docs.rs` are never touched again.
 
+use std::sync::Arc;
+
 use axum::Router;
 use di::ServiceCollection;
 use di::ServiceProvider;
+use di::singleton_factory;
 use utoipa::openapi::OpenApi;
 
 use crate::config::Config;
@@ -27,6 +30,15 @@ pub async fn provider(config: &Config) -> AppResult<ServiceProvider> {
     let repositories = db::repositories(config).await?;
 
     let mut services = ServiceCollection::new();
+
+    // The configuration is a shared dependency available to every feature: the
+    // auth library resolves its own `JwtConfig` from it without any feature
+    // knowing how the configuration is loaded.
+    let owned = config.clone();
+    services.add(singleton_factory::<Config, _>(
+        move |_| -> di::Ref<Config> { Arc::new(owned.clone()) },
+    ));
+
     for feature in registered() {
         (feature.register)(&repositories, &mut services);
     }

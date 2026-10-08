@@ -1,6 +1,7 @@
 //! API integration tests: HTTP CRUD for reports and categories,
-//! validation, relations, documentation.
+//! validation, relations, authentication and roles, documentation.
 
+mod auth;
 mod categories;
 mod crud;
 mod docs;

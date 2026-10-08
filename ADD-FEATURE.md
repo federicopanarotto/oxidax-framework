@@ -713,6 +713,73 @@ Punti chiave:
 
 ---
 
+## 7-bis. Proteggere un handler — `#[IsGranted]`
+
+Un handler può essere protetto dall'attributo `#[IsGranted]`, che va messo
+**sotto** `#[route]` (è la macro `#[route]` a consumarlo e a generare il
+guard; da solo non compila):
+
+```rust
+#[route]
+#[utoipa::path(
+    get,
+    path = "/api/users/me",
+    tag = "users",
+    responses(
+        (status = 200, description = "Profile of the authenticated user", body = UserResponse),
+        (status = 401, description = "Missing or invalid access token", body = ErrorResponse),
+        (status = 404, description = "User not found", body = ErrorResponse),
+        (status = 503, description = "Database unavailable", body = ErrorResponse),
+    ),
+    security(
+        ("accessToken" = []),
+    ),
+)]
+#[IsGranted] // any authenticated caller
+pub async fn get_me(
+    State(service): State<Arc<UserService>>,
+    current: CurrentUser,
+) -> AppResult<Json<UserResponse>> {
+    Ok(Json(service.me(&current.user_id).await?))
+}
+```
+
+Forme ammesse:
+
+- `#[IsGranted]`: qualsiasi chiamante autenticato.
+- `#[IsGranted(["admin"])]`: autenticato **e** ruolo fra quelli elencati (più
+  ruoli: `["admin", "editor"]`). Stringhe non ripetute.
+
+Cosa genera la macro (vedi `framework-macros/src/lib.rs`):
+
+- un layer `from_fn_with_state((JwtConfig, roles), guard)` sulla **singola
+  rotta**: niente layer globali, niente cablaggio manuale. Senza `#[IsGranted]`
+  la rotta resta pubblica e non dipende da `JwtConfig`.
+- il guard (`src/lib/auth/guard.rs`) estrae il bearer token, lo verifica e
+  inserisce `CurrentUser` nelle extensions della richiesta. Token
+  mancante/invalido/scaduto → `401`; ruolo non ammesso → `403`.
+
+Dentro l'handler l'utente corrente si legge con l'estrattore `CurrentUser`
+(re-export di `crate::framework`), che espone `user_id`, `identity_id` e
+`role`.
+
+Nel `#[utoipa::path]` dichiara sempre `security(("accessToken" = []))` (oppure
+`("refreshToken" = [])` per i refresh) e i `401`/`403` documentati: gli scheme
+son definiti una tantum in `src/api/docs.rs`, quindi qui serve solo il
+riferimento.
+
+Errori tipici:
+
+- **`cannot find attribute IsGranted`**: l'attributo è senza `#[route]` sopra
+  di esso (o è fuori dall'handler).
+- **`expected #[IsGranted] or #[IsGranted(["admin"])]`**: forma non valida
+  (es. `#[IsGranted("admin")]` o liste non fatte di stringhe).
+- **`401` inatteso su una rotta protetta**: l'handler non usa l'estrattore
+  `CurrentUser`… oppure il token è scaduto: controlla `exp`/leeway (jsonwebtoken
+  di default concede 60 secondi di leeway).
+
+---
+
 ## 8. Il wiring della feature — `src/api/places/mod.rs`
 
 Questo file fa **due sole cose**: (1) dichiara i sottomoduli; (2) registra la
@@ -1168,6 +1235,7 @@ Swagger UI su `http://localhost:3000/swagger-ui` (spec a
 - [ ] dichiara `pub mod places;` in `src/api/mod.rs` (§9)
 - [ ] aggiungi il repository in `src/db/mod.rs` (`Repositories` + `from_connection`) (§10)
 - [ ] collega `reports` (entity, dto, surreal repo, service, `order`) (§11)
+- [ ] se l'endpoint è protetto, `#[IsGranted]` + `security(...)` nel `utoipa::path` (§7-bis)
 - [ ] test + `cargo test`/`clippy`/`fmt` (§12–13)
 
 Ricapitolando i file **condivisi** toccati (e perché):
@@ -1197,3 +1265,5 @@ Ricapitolando i file **condivisi** toccati (e perché):
   messaggi di validazione sono in inglese).
 - **Campo `place` sempre `null`**: nel service dei report manca la chiamata a
   `place_of`/`by_id` dentro `decorate`/`list`.
+- **`cannot find attribute IsGranted`**: manca `#[route]` sopra `#[IsGranted]`
+  (vedi §7-bis).

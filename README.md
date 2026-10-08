@@ -31,7 +31,8 @@
 | Rotta self-registrata | `framework-macros` (mia proc-macro `#[route]`) + [inventory](https://github.com/dtolnay/inventory) | discovery statica delle rotte a compile-time                  |
 | Validazione   | [validator](https://github.com/Keats/validator)    | decoratori di validazione già maturi                          |
 | DI            | [more-di](https://github.com/AndyShi-more/MoreDi)  | iniezione lazy + `ServiceProvider`                            |
-| Database      | [SurrealDB](https://surrealdb.com) + `surrealdb`   | database performante, `mem://` per i test, schema-less        |
+| DB            | [SurrealDB](https://surrealdb.com) + `surrealdb`   | database performante, `mem://` per i test, schema-less        |
+| Auth          | `jsonwebtoken` + `argon2`                           | JWT HS256 (access/refresh) + hash password Argon2id           |
 | Errori        | `thiserror` + pipeline unificata                   | contratto di errore uniforme in tutta l'API                   |
 
 ## Struttura del progetto
@@ -51,10 +52,13 @@ src/
 │       ├── category_service.rs       # logica di dominio
 │       └── category_controller.rs    # gli handler HTTP con #[route]
 │   ├── places/               # feature "places" (city, address, cap, provenance)
-│   └── reports/              # feature "reports" (dipende da categories e places)
+│   ├── reports/              # feature "reports" (dipende da categories e places)
+│   ├── users/                # feature "users" (/api/users/me, lista admin)
+│   └── auth/                 # feature "auth" (register/login/refresh/logout)
 ├── lib/                      # il "core" del framework
 │   ├── registry.rs           # registri statici Feature (DI) e Route
 │   ├── validators.rs         # estrattori ValidatedJson/Query/Params
+│   ├── auth/                 # auth core: JWT, password, identità, guard/extractor
 │   └── middlewares/          # middleware estraibili, stile Express
 ├── errors/                   # contratto errori + pipeline HTTP
 ├── framework.rs              # facade: import unico (`crate::framework::*`) per le feature
@@ -110,6 +114,26 @@ Una nuova feature è *solo* il suo modulo. Presa "categories":
 Nessuna altra modifica: `features.rs`, `router.rs`, `docs.rs` iterano i
 registri statici e raccolgono automaticamente rotte e specifica OpenAPI.
 
+### Proteggere un handler
+
+Un handler autenticato (o riservato a dei ruoli) aggiunge un attributo,
+consumato da `#[route]`:
+
+```rust
+#[route]                                  // solo utenti autenticati
+#[utoipa::path(get, path = "/api/users/me", ...)]
+#[IsGranted]
+pub async fn get_me(service: ..., current: CurrentUser) -> ... { ... }
+
+#[route]                                  // solo ruoli ammessi
+#[IsGranted(["admin"])]
+pub async fn list_users(...) -> ... { ... }
+```
+
+La macro genera il layer con la guardia (`401` senza token valido, `403` col
+ruolo sbagliato) e l'estrattore `CurrentUser` espone `user_id`, `identity_id`
+e `role`: anche l'auth resta zero-touch, senza layer globali da configurare.
+
 ## Contratto delle risposte
 
 - **Successo**: corpo JSON del DTO di risposta (o `204`).
@@ -118,6 +142,27 @@ registri statici e raccolgono automaticamente rotte e specifica OpenAPI.
 - **Errore di validazione**: sempre `{error, details}` con `422`; body/query
   malformati danno `400`. Il campo `details` elenca i problemi campo per campo,
   formato "Gentile e professionale" pensato anche per l'utente finale.
+
+## Autenticazione
+
+JWT firmati in HS256 (`JWT_SECRET`) con due token distinti: un access token
+breve e un refresh token lungo e **monouso** (rotato a ogni refresh, bruciato
+dal logout).
+
+| Endpoint                 | Effetto                                                             |
+| ------------------------ | ------------------------------------------------------------------- |
+| `POST /api/auth/register` | `201 {message}`: nessun token; l'email è l'username (`role = user`) |
+| `POST /api/auth/login`   | `200 {access_token, refresh_token, token_type, expires_in}`         |
+| `POST /api/auth/refresh` | nuovo pair; il vecchio refresh token smette di funzionare           |
+| `POST /api/auth/logout`  | `204`: azzera il `jti` → il refresh token outstandig è revocato     |
+| `GET /api/users/me`      | profilo del chiamante con email                                      |
+| `GET /api/users`         | lista utenti con email, solo `admin`                                 |
+
+Errori **generici** per design: email ignota e password sbagliata danno lo
+stesso `401 invalid credentials`, il doppio register dà `409` generico (niente
+enumerazione account). Il primo admin si assegna direttamente sul database.
+In Swagger i due scheme `accessToken`/`refreshToken` (bearer JWT) sono pronti
+da usare con "Authorize".
 
 ## Documentazione
 
@@ -137,8 +182,9 @@ cp .env.example .env   # template con tutte le variabili richieste
 ```
 
 Variabili richieste: `SERVER_ADDR`, `DB_BACKEND` (`surreal` o `memory`),
-`SURREAL_URL`, `SURREAL_NS`, `SURREAL_DB`, `SURREAL_USER`, `SURREAL_PASS`.
-Se una variabile manca l'avvio fallisce con un messaggio esplicito.
+`SURREAL_URL`, `SURREAL_NS`, `SURREAL_DB`, `SURREAL_USER`, `SURREAL_PASS`,
+`JWT_SECRET`, `ACCESS_TOKEN_DURATION` (secondi), `REFRESH_TOKEN_DURATION`
+(secondi). Se una variabile manca l'avvio fallisce con un messaggio esplicito.
 
 ## Avvio
 
@@ -156,7 +202,7 @@ cargo run
 ## Test
 
 ```bash
-cargo test          # integration test end-to-end su HTTP reali (17 test)
+cargo test          # integration test end-to-end su HTTP reali (30 test)
 cargo clippy --all-targets -- -D warnings
 cargo fmt --check
 ```
@@ -167,9 +213,11 @@ cargo fmt --check
       handler, registri `inventory`)
 - [x] Validazione decorator su body/query/params con errori `422 {error, details}`
 - [x] Pipeline errori uniforme + fallback 404
-- [x] Feature di esempio: `categories` e `reports` su SurrealDB (`mem://` nei test)
+- [x] Feature di esempio: `categories`, `reports` e `places` su SurrealDB
+      (`mem://` nei test)
 - [x] Swagger UI live
-- [ ] Middleware (log, auth) come layering "stile Express"
+- [x] Access log (middleware esterno) + autenticazione JWT con guard
+      **per-rotta** (`#[IsGranted]`, ruoli inclusi)
 - [ ] Paginazione/ordinamento e altre utilità da riusare tra le feature
 
 > **Nota**: il framework è in costruzione e serve a imparare: l'API pubblica

@@ -50,6 +50,12 @@ pub enum AppError {
     #[error("{0}")]
     Validation(String),
     #[error("{0}")]
+    Conflict(String),
+    #[error("{0}")]
+    Unauthorized(String),
+    #[error("{0}")]
+    Forbidden(String),
+    #[error("{0}")]
     Database(String),
     #[error("{0}")]
     Internal(String),
@@ -63,6 +69,9 @@ impl AppError {
         match self {
             Self::NotFound(_) => "not_found",
             Self::Validation(_) => "validation_error",
+            Self::Conflict(_) => "conflict",
+            Self::Unauthorized(_) => "unauthorized",
+            Self::Forbidden(_) => "forbidden",
             Self::Database(_) => "database_unavailable",
             Self::Internal(_) => "internal_error",
         }
@@ -73,6 +82,9 @@ impl AppError {
         match self {
             Self::NotFound(_) => StatusCode::NOT_FOUND,
             Self::Validation(_) => StatusCode::BAD_REQUEST,
+            Self::Conflict(_) => StatusCode::CONFLICT,
+            Self::Unauthorized(_) => StatusCode::UNAUTHORIZED,
+            Self::Forbidden(_) => StatusCode::FORBIDDEN,
             Self::Database(_) => StatusCode::SERVICE_UNAVAILABLE,
             Self::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
