@@ -25,7 +25,7 @@ async fn reports_full_crud_cycle() {
     assert_eq!(status, StatusCode::CREATED, "{created}");
     let id = created["id"].as_str().expect("id presente").to_string();
     assert_eq!(created["name"], "Vendite mensili");
-    assert!(created["category_id"].is_null(), "{created}");
+    assert!(created.get("category_id").is_none(), "{created}");
     assert!(created["category"].is_null(), "{created}");
 
     let response = app

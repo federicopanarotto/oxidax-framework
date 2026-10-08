@@ -6,4 +6,5 @@
 //! `#[validate(...)]` decorators and, if anything fails, respond with the
 //! uniform error body before the controller method is called.
 
+pub mod access_log;
 pub mod validation_middleware;

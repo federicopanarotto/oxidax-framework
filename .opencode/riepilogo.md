@@ -1,5 +1,17 @@
 # riepilogo
 
+## Configurazione via `.env` + `dotenvy` (08/10)
+- [x] **`dotenvy`** aggiunto a `Cargo.toml`. `Config::from_env()` carica `.env` (`dotenvy::dotenv().ok()`, le env esistenti hanno precedenza) e legge **tutte** le variabili senza default: nessun valore hardcoded (nemmeno di prova). Nuovo helper `required("...")` che va in panico con messaggio esplicito se manca una variabile.
+- [x] **`.env`** (git-ignorato) e **`.env.example`** (template, versionato) con `DB_BACKEND`, `SERVER_ADDR`, `SURREAL_URL/NS/DB/USER/PASS`. `.gitignore` aggiornato con `.env`.
+- [x] **`main.rs`**: `dotenvy::dotenv().ok()` prima del setup di tracing (così `RUST_LOG` dal file è rispettato) + **doc-comment di modulo e commenti in inglese** su ogni fase (runtime tokio, tracing, config, build app, bind, log, serve).
+- [x] **README**: nuova sezione "Configurazione" (solo env, `cp .env.example .env`, variabili richieste, fallimento esplicito se manca) + "Avvio" aggiornato.
+- [x] Verifiche: `cargo test` **13/13** + 1 doctest ✓; `cargo clippy --all-targets -- -D warnings` ✓; `cargo fmt` ✓.
+
+## Messaggi in inglese + response report senza `category_id` (08/10)
+- [x] **Tutti i messaggi a livello API/log tradotti in inglese** (richiesta esplicita): messaggi di validazione dei DTO (report/category), messaggi degli estrattori `ValidatedJson`/`Query`/`Params` (`Validation error on ...`, `Body JSON is invalid or malformed`, ...), esempio `ValidationErrorResponse`, tutte le `description = "..."` utoipa dei controller, log/`expect` in `main.rs` (`failed to start the application`, `swagger UI at ...`) e `pipeline.rs` (`internal error`, `request rejected`). I commenti restano in inglese; le stringhe-dato nei test/esempi (es. `"Report di ottobre"`) sono invariate. Asserzioni dei test aggiornate ai nuovi messaggi.
+- [x] **`ReportResponse` senza `category_id`** (richiesta esplicita: "il campo è di troppo, c'è già l'oggetto nested"): rimosso il campo `category_id` dalla response e dal `From<...>`; la relazione è esposta solo come `category: Option<CategoryResponse>` (con `id`+`name`). Entity/repository/service continuano a gestire internamente `category_id` per validazione e persistenza.
+- [x] Verifiche: `cargo test` **13/13** + 1 doctest ✓; `cargo clippy --all-targets -- -D warnings` ✓; `cargo fmt` ✓.
+
 ## Framework zero-touch: `#[route]` + registri statici (08/10)
 - [x] **Proc-macro crate `framework-macros/`**: attributo `#[route]` su ogni handler → espande l'handler invariato + genera un builder `fn(&ServiceProvider) -> (Router, OpenApi)` (risolve il service dal provider DI via `provider.get_required::<T>()` dove `T` è estratto dal `State<Arc<T>>` della firma) + `inventory::submit!` nel registro `Route`. Verifica di compile-time: presenza `#[utoipa::path(...)]` e argomento `State<Arc<T>>`. Il codice generato usa path fully-qualified (`di::`, `axum::`, `utoipa::`, `utoipa_axum::`, `inventory::`), così gli handler non hanno bisogno di import.
 - [x] **`src/lib/registry.rs`**: registri doppi — `Feature { order, register }` (solo DI: repo + service) e `Route { build }` (una rotta per handler); due `inventory::collect!`; `register_repository` resta.

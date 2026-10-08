@@ -130,7 +130,7 @@ async fn report_accepts_existing_category() {
     let status = response.status();
     let created = json_body(response).await;
     assert_eq!(status, StatusCode::CREATED, "{created}");
-    assert_eq!(created["category_id"], category_id.as_str());
+    assert!(created.get("category_id").is_none(), "{created}");
     assert_eq!(created["category"]["id"], category_id.as_str());
     assert_eq!(created["category"]["name"], "Finanza");
 
@@ -147,7 +147,7 @@ async fn report_accepts_existing_category() {
         .await
         .unwrap();
     let fetched = json_body(response).await;
-    assert_eq!(fetched["category_id"], category_id.as_str());
+    assert!(fetched.get("category_id").is_none(), "{fetched}");
     assert_eq!(fetched["category"]["id"], category_id.as_str());
     assert_eq!(fetched["category"]["name"], "Finanza");
 }
@@ -234,7 +234,7 @@ async fn update_can_remove_category() {
         .unwrap();
     let created = json_body(response).await;
     let report_id = created["id"].as_str().unwrap().to_string();
-    assert_eq!(created["category_id"], category_id.as_str());
+    assert!(created.get("category_id").is_none(), "{created}");
 
     let response = app
         .clone()
@@ -252,6 +252,6 @@ async fn update_can_remove_category() {
     let status = response.status();
     let updated = json_body(response).await;
     assert_eq!(status, StatusCode::OK, "{updated}");
-    assert!(updated["category_id"].is_null(), "{updated}");
+    assert!(updated.get("category_id").is_none(), "{updated}");
     assert!(updated["category"].is_null(), "{updated}");
 }

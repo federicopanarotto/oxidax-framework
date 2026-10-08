@@ -124,6 +124,21 @@ La UI Swagger è servita, live, a **`/swagger-ui`** (spec completa a
 `/api-docs/openapi.json`). Niente file di export: è il framework che compone lo
 spec OpenAPI a partire dalle macro mentre monta le rotte.
 
+## Configurazione
+
+La configurazione arriva **solo** da variabili d'ambiente: nessun valore è
+hardcoded nel codice. In locale i valori sono letti dal file `.env`
+(git-ignorato) tramite `dotenvy`; le variabili già presenti nell'ambiente hanno
+precedenza su quelle del file.
+
+```bash
+cp .env.example .env   # template con tutte le variabili richieste
+```
+
+Variabili richieste: `SERVER_ADDR`, `DB_BACKEND` (`surreal` o `memory`),
+`SURREAL_URL`, `SURREAL_NS`, `SURREAL_DB`, `SURREAL_USER`, `SURREAL_PASS`.
+Se una variabile manca l'avvio fallisce con un messaggio esplicito.
+
 ## Avvio
 
 ```bash
@@ -133,12 +148,9 @@ docker compose -f .devcontainer/docker-compose.yml up -d
 # Backend in-memory, senza SurrealDB esterno
 DB_BACKEND=memory cargo run
 
-# Backend su SurrealDB (di default)
-cargo run                                  # SURREAL_URL=ws://localhost:8000 ...
+# Backend su SurrealDB (valori dal .env)
+cargo run
 ```
-
-Variabili d'ambiente: `SERVER_ADDR`, `DB_BACKEND`, `SURREAL_URL`,
-`SURREAL_NS`, `SURREAL_DB`, `SURREAL_USER`, `SURREAL_PASS`.
 
 ## Test
 

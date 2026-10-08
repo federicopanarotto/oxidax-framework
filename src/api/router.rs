@@ -1,10 +1,12 @@
 use axum::Router;
+use axum::middleware::from_fn;
 use axum::routing::get;
 
 use crate::api::docs;
 use crate::api::features;
 use crate::config::Config;
 use crate::errors::{AppResult, pipeline};
+use crate::lib::middlewares::access_log::access_log;
 
 /// Overall API router.
 ///
@@ -23,7 +25,9 @@ pub async fn build(config: &Config) -> AppResult<Router> {
         router = router.merge(route);
     }
     router = router.merge(docs::swagger_router(api));
-    Ok(router.fallback(pipeline::route_not_found))
+    Ok(router
+        .fallback(pipeline::route_not_found)
+        .layer(from_fn(access_log)))
 }
 
 async fn health() -> &'static str {

@@ -27,19 +27,32 @@ impl Config {
     }
 
     pub fn from_env() -> Self {
-        let db_backend = match env::var("DB_BACKEND").unwrap_or_else(|_| "surreal".into()) {
+        // Load the `.env` file if present. Existing environment variables win
+        // (dotenvy does not override them by default), so deployments can inject
+        // real values and only fall back to the file for local development.
+        dotenvy::dotenv().ok();
+
+        let db_backend = match required("DB_BACKEND") {
             s if s.eq_ignore_ascii_case("memory") => DbBackend::Memory,
             _ => DbBackend::Surreal,
         };
 
         Self {
-            server_addr: env::var("SERVER_ADDR").unwrap_or_else(|_| "0.0.0.0:3000".into()),
+            server_addr: required("SERVER_ADDR"),
             db_backend,
-            surreal_url: env::var("SURREAL_URL").unwrap_or_else(|_| "ws://localhost:8000".into()),
-            surreal_ns: env::var("SURREAL_NS").unwrap_or_else(|_| "test".into()),
-            surreal_db: env::var("SURREAL_DB").unwrap_or_else(|_| "reports".into()),
-            surreal_user: env::var("SURREAL_USER").unwrap_or_else(|_| "root".into()),
-            surreal_pass: env::var("SURREAL_PASS").unwrap_or_else(|_| "root".into()),
+            surreal_url: required("SURREAL_URL"),
+            surreal_ns: required("SURREAL_NS"),
+            surreal_db: required("SURREAL_DB"),
+            surreal_user: required("SURREAL_USER"),
+            surreal_pass: required("SURREAL_PASS"),
         }
     }
+}
+
+/// Reads a mandatory environment variable: configuration is never hardcoded in
+/// the code, it always comes from the environment/`.env` (see `.env.example`).
+fn required(key: &str) -> String {
+    env::var(key).unwrap_or_else(|_| {
+        panic!("missing required environment variable `{key}` (see .env.example)")
+    })
 }
