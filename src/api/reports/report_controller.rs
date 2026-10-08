@@ -16,6 +16,22 @@ use crate::framework::{ValidatedJson, ValidationErrorResponse, route};
 
 #[route]
 #[utoipa::path(
+    get,
+    path = "/api/reports",
+    tag = "reports",
+    responses(
+        (status = 200, description = "List of reports", body = [ReportResponse]),
+        (status = 503, description = "Database unavailable", body = ErrorResponse),
+    ),
+)]
+pub async fn list_reports(
+    State(service): State<Arc<ReportService>>,
+) -> AppResult<Json<Vec<ReportResponse>>> {
+    Ok(Json(service.list().await?))
+}
+
+#[route]
+#[utoipa::path(
     post,
     path = "/api/reports",
     tag = "reports",
@@ -33,22 +49,6 @@ pub async fn create_report(
 ) -> AppResult<(StatusCode, Json<ReportResponse>)> {
     let created = service.create(dto).await?;
     Ok((StatusCode::CREATED, Json(created)))
-}
-
-#[route]
-#[utoipa::path(
-    get,
-    path = "/api/reports",
-    tag = "reports",
-    responses(
-        (status = 200, description = "List of reports", body = [ReportResponse]),
-        (status = 503, description = "Database unavailable", body = ErrorResponse),
-    ),
-)]
-pub async fn list_reports(
-    State(service): State<Arc<ReportService>>,
-) -> AppResult<Json<Vec<ReportResponse>>> {
-    Ok(Json(service.list().await?))
 }
 
 #[route]
