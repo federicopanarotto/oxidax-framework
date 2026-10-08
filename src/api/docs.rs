@@ -14,11 +14,7 @@ use utoipa_swagger_ui::SwaggerUi;
         title = "Axum Reports API",
         version = "0.1.0",
         description = "CRUD API per la gestione dei report e delle categorie"
-    ),
-    tags(
-        (name = "reports", description = "Gestione dei report"),
-        (name = "categories", description = "Gestione delle categorie"),
-    ),
+    )
 )]
 pub struct ApiDoc;
 

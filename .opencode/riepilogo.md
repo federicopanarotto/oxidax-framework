@@ -1,5 +1,10 @@
 # riepilogo
 
+## Access log richieste (08/10)
+- [x] **Middleware `src/lib/middlewares/access_log.rs`** (`axum::middleware::from_fn`): misura la latenza e logga una riga compatta per ogni richiesta, formato `METODO path status elapsed_ms` → es. `POST /api/reports 201 3ms`. Usa `as_u16()` per lo status (solo codice numerico, senza reason phrase); path + query string.
+- [x] Montato outermost in `router.rs` con `.layer(from_fn(access_log))`, così copre tutte le rotte, il fallback e la Swagger UI.
+- [x] Smoke test: verificato `POST /api/reports 400 0ms` a runtime. Verifiche: `cargo test` **13/13** + doctest ✓; clippy ✓; fmt ✓.
+
 ## Configurazione via `.env` + `dotenvy` (08/10)
 - [x] **`dotenvy`** aggiunto a `Cargo.toml`. `Config::from_env()` carica `.env` (`dotenvy::dotenv().ok()`, le env esistenti hanno precedenza) e legge **tutte** le variabili senza default: nessun valore hardcoded (nemmeno di prova). Nuovo helper `required("...")` che va in panico con messaggio esplicito se manca una variabile.
 - [x] **`.env`** (git-ignorato) e **`.env.example`** (template, versionato) con `DB_BACKEND`, `SERVER_ADDR`, `SURREAL_URL/NS/DB/USER/PASS`. `.gitignore` aggiornato con `.env`.
