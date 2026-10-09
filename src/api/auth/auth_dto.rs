@@ -10,7 +10,7 @@ use crate::lib::Validate;
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Validate)]
 pub struct RegisterRequest {
     /// Email used as username for the local login
-    #[schema(example = "mario.rossi@example.com", max_length = 254)]
+    #[schema(example = "developer@example.com", max_length = 254)]
     #[validate(
         email(message = "The email must be a valid address"),
         length(max = 254, message = "The email must be at most 254 characters")
@@ -53,7 +53,7 @@ pub struct RegisterRequest {
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Validate)]
 pub struct LoginRequest {
     /// Email used as username
-    #[schema(example = "mario.rossi@example.com", max_length = 254)]
+    #[schema(example = "developer@example.com", max_length = 254)]
     #[validate(
         custom(
             function = "crate::lib::validators::not_blank",
