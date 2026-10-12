@@ -58,12 +58,15 @@ src/
 ├── lib/                      # il "core" del framework
 │   ├── registry.rs           # registri statici Feature (DI) e Route
 │   ├── validators.rs         # estrattori ValidatedJson/Query/Params
+│   ├── pagination.rs         # PaginationQuery + Pagination + Paged<T> (X-TOTAL-LIST)
 │   ├── auth/                 # auth core: JWT, password, identità, guard/extractor
 │   └── middlewares/          # middleware estraibili, stile Express
 ├── errors/                   # contratto errori + pipeline HTTP
 ├── framework.rs              # facade: import unico (`crate::framework::*`) per le feature
 ├── config.rs                 # configurazione da env
 └── db/                       # connessione SurrealDB + aggregatore repository
+    ├── mod.rs                # connessione + aggregatore repository
+    └── query.rs              # helper riusabili: count e select_page paginati
 framework-macros/             # la proc-macro #[route]
 tests/report/                 # integration test end-to-end (HTTP reali)
 ```
@@ -143,6 +146,37 @@ e `role`: anche l'auth resta zero-touch, senza layer globali da configurare.
   malformati danno `400`. Il campo `details` elenca i problemi campo per campo,
   formato "Gentile e professionale" pensato anche per l'utente finale.
 
+## Paginazione
+
+Le liste (`/api/categories`, `/api/places`, `/api/reports`, `/api/users`) sono
+paginabili con due query param **opzionali** e validati:
+
+| Parametro | Default | Vincoli      |
+| --------- | ------- | ------------ |
+| `page`    | `1`     | `>= 1`       |
+| `limit`   | `20`    | tra `1` e `100` |
+
+Il **corpo della risposta resta l'array JSON** di sempre, senza envelope. Il
+numero totale di elementi (su tutte le pagine) viaggia nell'header
+**`X-TOTAL-LIST`**, così il client può calcolare il numero di pagine:
+
+```http
+GET /api/categories?page=2&limit=5
+X-TOTAL-LIST: 42
+```
+
+```json
+[ { "id": "...", "name": "Vendita" }, ... ]
+```
+
+I valori fuori range danno `422 {error, details}` (come ogni DTO validato); un
+valore non numerico dà `400`. Tutto è riutilizzabile: il DTO
+`PaginationQuery`, il value object `Pagination` e il payload `Paged<T>` vivono
+in `src/lib/pagination.rs` e gli helper di query (count + pagina) in
+`src/db/query.rs`. Una feature paginata aggiunge solo un estrattore e fa
+ritornare `Paged<T>` dal service; il controller chiama `page.into_response()`
+per comporre corpo + header.
+
 ## Autenticazione
 
 JWT firmati in HS256 (`JWT_SECRET`) con due token distinti: un access token
@@ -156,7 +190,7 @@ dal logout).
 | `POST /api/auth/refresh` | nuovo pair; il vecchio refresh token smette di funzionare           |
 | `POST /api/auth/logout`  | `204`: azzera il `jti` → il refresh token outstandig è revocato     |
 | `GET /api/users/me`      | profilo del chiamante con email                                      |
-| `GET /api/users`         | lista utenti con email, solo `admin`; filtro opzionale `?role=admin\|user` |
+| `GET /api/users`         | lista utenti con email, solo `admin`; filtro opzionale `?role=admin\|user`, paginata (`?page=`, `?limit=`) |
 
 Errori **generici** per design: email ignota e password sbagliata danno lo
 stesso `401 invalid credentials`, il doppio register dà `409` generico (niente
@@ -230,7 +264,7 @@ resto del progetto, ignorando `target/`.
 ## Test
 
 ```bash
-cargo test          # integration test end-to-end su HTTP reali (37 test)
+cargo test          # integration test end-to-end su HTTP reali (40 test)
 cargo clippy --all-targets -- -D warnings
 cargo fmt --check
 ```
@@ -251,7 +285,10 @@ cargo fmt --check
       `PUT`/`DELETE` sono autenticati, le letture restano pubbliche
 - [x] Query param validati: `GET /api/users?role=admin|user` (`UserListQueryDto`
       con `ValidatedQuery`, `422` sui valori fuori elenco)
-- [ ] Paginazione/ordinamento e altre utilità da riusare tra le feature
+- [x] Paginazione riutilizzabile su tutte le liste: `?page=&limit=` validati,
+      array nel body e totale in `X-TOTAL-LIST` (`Paged<T>` +
+      `src/db/query.rs`); `422` fuori range
+- [ ] Ordinamento (`?sort=`) e ricerca/filtri condivisi tra le feature
 
 > **Nota**: il framework è in costruzione e serve a imparare: l'API pubblica
 > delle macro e la struttura dei registri possono cambiare.

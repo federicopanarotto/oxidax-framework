@@ -16,5 +16,13 @@ pub trait UserRepository: Send + Sync {
     /// Users with the exact role (the query filter of the list: the service
     /// only passes values already validated at the DTO level).
     async fn find_by_role(&self, role: &str) -> AppResult<Vec<User>>;
+    /// One page of users: `offset` skipped, at most `limit` returned.
+    async fn find_page(&self, offset: u64, limit: u64) -> AppResult<Vec<User>>;
+    /// One page of users with the exact role.
+    async fn find_page_by_role(&self, role: &str, offset: u64, limit: u64) -> AppResult<Vec<User>>;
+    /// Total number of users, used to fill the pagination metadata.
+    async fn count(&self) -> AppResult<u64>;
+    /// Total number of users with the exact role.
+    async fn count_by_role(&self, role: &str) -> AppResult<u64>;
     async fn remove(&self, id: &str) -> AppResult<bool>;
 }

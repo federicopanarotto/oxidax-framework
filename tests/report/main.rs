@@ -6,6 +6,7 @@ mod categories;
 mod creator;
 mod crud;
 mod docs;
+mod pagination;
 mod places;
 mod service;
 mod support;

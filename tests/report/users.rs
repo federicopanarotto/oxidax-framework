@@ -2,7 +2,8 @@
 //! validated by the `ValidatedQuery` extractor before the controller runs.
 
 use axum::Router;
-use axum::http::StatusCode;
+use axum::body::Body;
+use axum::http::{Request, StatusCode};
 use serde_json::json;
 use tower::ServiceExt;
 
@@ -99,6 +100,60 @@ async fn users_list_filters_by_role() {
     assert_eq!(admins.len(), 1, "{body}");
     assert_eq!(admins[0]["role"], "admin");
     assert_eq!(admins[0]["email"], "admin@example.com");
+}
+
+#[tokio::test]
+async fn users_list_is_paginated_and_reports_the_total() {
+    let (app, provider) = app_and_provider().await;
+    let admin = admin_token(&app, &provider).await;
+    access_token_for(&app, "p1@example.com").await;
+    access_token_for(&app, "p2@example.com").await;
+
+    // 3 users total (1 admin + 2 members), first page of two.
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/users?page=1&limit=2")
+                .header("authorization", format!("Bearer {admin}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let total = response
+        .headers()
+        .get("x-total-list")
+        .and_then(|value| value.to_str().ok())
+        .map(ToString::to_string);
+    assert_eq!(total.as_deref(), Some("3"));
+    let body = json_body(response).await;
+    assert_eq!(body.as_array().expect("lista").len(), 2, "{body}");
+
+    // The role filter combines with the pagination and its own total.
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/users?role=user&page=2&limit=1")
+                .header("authorization", format!("Bearer {admin}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let total = response
+        .headers()
+        .get("x-total-list")
+        .and_then(|value| value.to_str().ok())
+        .map(ToString::to_string);
+    assert_eq!(total.as_deref(), Some("2"));
+    let body = json_body(response).await;
+    let users = body.as_array().expect("lista filtrata");
+    assert_eq!(users.len(), 1, "{body}");
+    assert_eq!(users[0]["role"], "user", "{body}");
 }
 
 #[tokio::test]

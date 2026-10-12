@@ -14,5 +14,6 @@ pub use crate::lib::auth::CurrentUser;
 pub use crate::lib::middlewares::validation_middleware::{
     ValidatedJson, ValidatedParams, ValidatedQuery, ValidationErrorResponse,
 };
+pub use crate::lib::pagination::{Paged, Pagination, PaginationQuery, TOTAL_HEADER};
 pub use crate::lib::registry::{Feature, Route, register_repository};
 pub use framework_macros::route;

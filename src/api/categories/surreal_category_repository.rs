@@ -6,7 +6,7 @@ use surrealdb::types::{RecordId, SurrealValue};
 
 use crate::api::categories::category_entity::Category;
 use crate::api::categories::category_repository::CategoryRepository;
-use crate::db::{define_table, record_key_to_string};
+use crate::db::{define_table, query, record_key_to_string};
 use crate::errors::{AppError, AppResult};
 
 const TABLE: &str = "category";
@@ -84,6 +84,15 @@ impl CategoryRepository for SurrealCategoryRepository {
     async fn find_all(&self) -> AppResult<Vec<Category>> {
         let rows: Vec<CategoryRow> = self.db.select(TABLE).await?;
         Ok(rows.into_iter().map(into_entity).collect())
+    }
+
+    async fn find_page(&self, offset: u64, limit: u64) -> AppResult<Vec<Category>> {
+        let rows: Vec<CategoryRow> = query::select_page(&self.db, TABLE, offset, limit).await?;
+        Ok(rows.into_iter().map(into_entity).collect())
+    }
+
+    async fn count(&self) -> AppResult<u64> {
+        query::count(&self.db, TABLE).await
     }
 
     async fn replace(&self, id: &str, category: Category) -> AppResult<Option<Category>> {

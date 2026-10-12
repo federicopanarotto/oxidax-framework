@@ -12,6 +12,7 @@ use crate::api::reports::report_repository::ReportRepository;
 use crate::api::users::user_dto::UserSummaryResponse;
 use crate::api::users::user_service::UserService;
 use crate::errors::{AppError, AppResult};
+use crate::lib::pagination::{Paged, Pagination};
 
 /// Business rules for reports.
 ///
@@ -50,28 +51,20 @@ impl ReportService {
 
     pub async fn list(&self) -> AppResult<Vec<ReportResponse>> {
         let reports = self.repository.find_all().await?;
-        let categories = self.categories.by_id().await?;
-        let places = self.places.by_id().await?;
-        let users = self.users.by_id().await?;
+        self.decorate_all(reports).await
+    }
 
-        Ok(reports
-            .into_iter()
-            .map(|report| {
-                let category = report
-                    .category_id
-                    .as_ref()
-                    .and_then(|id| categories.get(id).cloned());
-                let place = report
-                    .place_id
-                    .as_ref()
-                    .and_then(|id| places.get(id).cloned());
-                let created_by = report
-                    .user_id
-                    .as_ref()
-                    .and_then(|id| users.get(id).cloned());
-                (report, category, place, created_by).into()
-            })
-            .collect())
+    /// One page of reports with the total count (sent as `X-TOTAL-LIST`).
+    /// The related objects (category, place, creator) are resolved with a
+    /// single read each, not per element.
+    pub async fn list_page(&self, pagination: Pagination) -> AppResult<Paged<ReportResponse>> {
+        let total = self.repository.count().await?;
+        let reports = self
+            .repository
+            .find_page(pagination.offset(), pagination.limit())
+            .await?;
+        let items = self.decorate_all(reports).await?;
+        Ok(Paged::new(items, total))
     }
 
     pub async fn update(&self, id: &str, dto: UpdateReportDto) -> AppResult<ReportResponse> {
@@ -126,6 +119,33 @@ impl ReportService {
         let place = self.place_of(&report).await?;
         let created_by = self.creator_of(&report).await?;
         Ok((report, category, place, created_by).into())
+    }
+
+    /// Decorates a whole list resolving the relations with one read per
+    /// table (index maps) instead of N+1 queries per element.
+    async fn decorate_all(&self, reports: Vec<Report>) -> AppResult<Vec<ReportResponse>> {
+        let categories = self.categories.by_id().await?;
+        let places = self.places.by_id().await?;
+        let users = self.users.by_id().await?;
+
+        Ok(reports
+            .into_iter()
+            .map(|report| {
+                let category = report
+                    .category_id
+                    .as_ref()
+                    .and_then(|id| categories.get(id).cloned());
+                let place = report
+                    .place_id
+                    .as_ref()
+                    .and_then(|id| places.get(id).cloned());
+                let created_by = report
+                    .user_id
+                    .as_ref()
+                    .and_then(|id| users.get(id).cloned());
+                (report, category, place, created_by).into()
+            })
+            .collect())
     }
 
     async fn category_of(&self, report: &Report) -> AppResult<Option<CategoryResponse>> {

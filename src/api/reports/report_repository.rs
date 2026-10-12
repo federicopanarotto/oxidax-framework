@@ -13,6 +13,10 @@ pub trait ReportRepository: Send + Sync {
     async fn insert(&self, report: Report) -> AppResult<Report>;
     async fn find_by_id(&self, id: &str) -> AppResult<Option<Report>>;
     async fn find_all(&self) -> AppResult<Vec<Report>>;
+    /// One page of reports: `offset` skipped, at most `limit` returned.
+    async fn find_page(&self, offset: u64, limit: u64) -> AppResult<Vec<Report>>;
+    /// Total number of reports, used to fill the pagination metadata.
+    async fn count(&self) -> AppResult<u64>;
     async fn replace(&self, id: &str, report: Report) -> AppResult<Option<Report>>;
     async fn remove(&self, id: &str) -> AppResult<bool>;
 }

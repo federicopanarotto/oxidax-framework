@@ -1,3 +1,4 @@
+pub mod query;
 mod surreal;
 
 use std::sync::Arc;

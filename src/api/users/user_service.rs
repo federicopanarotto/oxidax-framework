@@ -7,6 +7,7 @@ use crate::api::users::user_dto::{UserResponse, UserSummaryResponse};
 use crate::api::users::user_repository::UserRepository;
 use crate::errors::{AppError, AppResult};
 use crate::lib::auth::UserIdentityRepository;
+use crate::lib::pagination::{Paged, Pagination};
 
 /// Business rules for users (profiles and roles).
 ///
@@ -85,6 +86,46 @@ impl UserService {
                 UserResponse::new(user, email)
             })
             .collect())
+    }
+
+    /// One page of users (optionally filtered by role) with the total count,
+    /// resolved with a single read of the identities (index instead of N+1
+    /// queries).
+    pub async fn list_page(
+        &self,
+        role: Option<&str>,
+        pagination: Pagination,
+    ) -> AppResult<Paged<UserResponse>> {
+        let emails: HashMap<String, String> = self
+            .identities
+            .find_all()
+            .await?
+            .into_iter()
+            .map(|identity| (identity.user_id, identity.identifier))
+            .collect();
+
+        let offset = pagination.offset();
+        let limit = pagination.limit();
+        let (users, total) = match role {
+            Some(role) => (
+                self.users.find_page_by_role(role, offset, limit).await?,
+                self.users.count_by_role(role).await?,
+            ),
+            None => (
+                self.users.find_page(offset, limit).await?,
+                self.users.count().await?,
+            ),
+        };
+
+        let items = users
+            .into_iter()
+            .map(|user| {
+                let email = emails.get(&user.id).cloned();
+                UserResponse::new(user, email)
+            })
+            .collect();
+
+        Ok(Paged::new(items, total))
     }
 }
 

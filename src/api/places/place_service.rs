@@ -6,6 +6,7 @@ use di::injectable;
 use crate::api::places::place_dto::{CreatePlaceDto, PlaceResponse, UpdatePlaceDto};
 use crate::api::places::place_repository::PlaceRepository;
 use crate::errors::{AppError, AppResult};
+use crate::lib::pagination::{Paged, Pagination};
 
 /// Business rules for places.
 ///
@@ -37,6 +38,18 @@ impl PlaceService {
             .find_all()
             .await
             .map(|places| places.into_iter().map(Into::into).collect())
+    }
+
+    /// One page of places with the total count (sent as `X-TOTAL-LIST`).
+    pub async fn list_page(&self, pagination: Pagination) -> AppResult<Paged<PlaceResponse>> {
+        let total = self.repository.count().await?;
+        let places = self
+            .repository
+            .find_page(pagination.offset(), pagination.limit())
+            .await?;
+
+        let items = places.into_iter().map(Into::into).collect();
+        Ok(Paged::new(items, total))
     }
 
     pub async fn update(&self, id: &str, dto: UpdatePlaceDto) -> AppResult<PlaceResponse> {

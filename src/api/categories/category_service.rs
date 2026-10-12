@@ -8,6 +8,7 @@ use crate::api::categories::category_dto::{
 };
 use crate::api::categories::category_repository::CategoryRepository;
 use crate::errors::{AppError, AppResult};
+use crate::lib::pagination::{Paged, Pagination};
 
 /// Business rules for categories.
 ///
@@ -39,6 +40,18 @@ impl CategoryService {
             .find_all()
             .await
             .map(|categories| categories.into_iter().map(Into::into).collect())
+    }
+
+    /// One page of categories with the total count (sent as `X-TOTAL-LIST`).
+    pub async fn list_page(&self, pagination: Pagination) -> AppResult<Paged<CategoryResponse>> {
+        let total = self.repository.count().await?;
+        let categories = self
+            .repository
+            .find_page(pagination.offset(), pagination.limit())
+            .await?;
+
+        let items = categories.into_iter().map(Into::into).collect();
+        Ok(Paged::new(items, total))
     }
 
     pub async fn update(&self, id: &str, dto: UpdateCategoryDto) -> AppResult<CategoryResponse> {

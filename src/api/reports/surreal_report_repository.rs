@@ -6,7 +6,7 @@ use surrealdb::types::{RecordId, SurrealValue};
 
 use crate::api::reports::report_entity::Report;
 use crate::api::reports::report_repository::ReportRepository;
-use crate::db::{define_table, record_key_to_string};
+use crate::db::{define_table, query, record_key_to_string};
 use crate::errors::{AppError, AppResult};
 
 const TABLE: &str = "report";
@@ -112,6 +112,15 @@ impl ReportRepository for SurrealReportRepository {
     async fn find_all(&self) -> AppResult<Vec<Report>> {
         let rows: Vec<ReportRow> = self.db.select(TABLE).await?;
         Ok(rows.into_iter().map(into_entity).collect())
+    }
+
+    async fn find_page(&self, offset: u64, limit: u64) -> AppResult<Vec<Report>> {
+        let rows: Vec<ReportRow> = query::select_page(&self.db, TABLE, offset, limit).await?;
+        Ok(rows.into_iter().map(into_entity).collect())
+    }
+
+    async fn count(&self) -> AppResult<u64> {
+        query::count(&self.db, TABLE).await
     }
 
     async fn replace(&self, id: &str, report: Report) -> AppResult<Option<Report>> {

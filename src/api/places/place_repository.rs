@@ -13,6 +13,10 @@ pub trait PlaceRepository: Send + Sync {
     async fn insert(&self, place: Place) -> AppResult<Place>;
     async fn find_by_id(&self, id: &str) -> AppResult<Option<Place>>;
     async fn find_all(&self) -> AppResult<Vec<Place>>;
+    /// One page of places: `offset` skipped, at most `limit` returned.
+    async fn find_page(&self, offset: u64, limit: u64) -> AppResult<Vec<Place>>;
+    /// Total number of places, used to fill the pagination metadata.
+    async fn count(&self) -> AppResult<u64>;
     async fn replace(&self, id: &str, place: Place) -> AppResult<Option<Place>>;
     async fn remove(&self, id: &str) -> AppResult<bool>;
 }

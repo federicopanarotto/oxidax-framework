@@ -3,11 +3,14 @@ use std::sync::Arc;
 use axum::Json;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
+use axum::response::Response;
 
 use crate::api::places::place_dto::{CreatePlaceDto, PlaceResponse, UpdatePlaceDto};
 use crate::api::places::place_service::PlaceService;
 use crate::errors::{AppResult, BadRequestResponse, ErrorResponse};
-use crate::framework::{ValidatedJson, ValidationErrorResponse, route};
+use crate::framework::{
+    PaginationQuery, ValidatedJson, ValidatedQuery, ValidationErrorResponse, route,
+};
 
 // Route table and OpenAPI spec of the places, defined point-inline: every
 // handler is annotated with `#[utoipa::path(...)]` (HTTP method, path and
@@ -19,15 +22,22 @@ use crate::framework::{ValidatedJson, ValidationErrorResponse, route};
     get,
     path = "/api/places",
     tag = "places",
+    params(
+        ("page" = Option<u64>, Query, description = "Page number, 1-based (default 1)", example = 1),
+        ("limit" = Option<u64>, Query, description = "Elements per page, 1-100 (default 20)", example = 20),
+    ),
     responses(
-        (status = 200, description = "List of places", body = [PlaceResponse]),
+        (status = 200, description = "Paginated list of places; the total number of elements is returned in the `X-TOTAL-LIST` header", body = [PlaceResponse], headers(("X-TOTAL-LIST" = u64, description = "Total number of places across every page"))),
+        (status = 422, description = "Invalid pagination parameters", body = ValidationErrorResponse),
         (status = 503, description = "Database unavailable", body = ErrorResponse),
     ),
 )]
 pub async fn list_places(
     State(service): State<Arc<PlaceService>>,
-) -> AppResult<Json<Vec<PlaceResponse>>> {
-    Ok(Json(service.list().await?))
+    ValidatedQuery(pagination): ValidatedQuery<PaginationQuery>,
+) -> AppResult<Response> {
+    let page = service.list_page(pagination.pagination()).await?;
+    Ok(page.into_response())
 }
 
 #[route]

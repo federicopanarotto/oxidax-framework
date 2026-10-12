@@ -780,6 +780,92 @@ Errori tipici:
 
 ---
 
+## 7-ter. Paginare una lista — `PaginationQuery` + `Paged<T>`
+
+Tutte le liste del framework (`categories`, `places`, `reports`, `users`)
+condividono la stessa paginazione riutilizzabile (`src/lib/pagination.rs`), così
+non serve riscriverla per feature. Il contratto è: **body = array JSON** di
+sempre, **totale elementi nell'header `X-TOTAL-LIST`** (nessun envelope).
+
+Lato **repository** aggiungi i due metodi paginati al trait e all'implementazione,
+riusando gli helper di `src/db/query.rs`:
+
+```rust
+// place_repository.rs
+async fn find_page(&self, offset: u64, limit: u64) -> AppResult<Vec<Place>>;
+async fn count(&self) -> AppResult<u64>;
+```
+
+```rust
+// surreal_place_repository.rs
+async fn find_page(&self, offset: u64, limit: u64) -> AppResult<Vec<Place>> {
+    let rows: Vec<PlaceRow> = query::select_page(&self.db, TABLE, offset, limit).await?;
+    Ok(rows.into_iter().map(into_entity).collect())
+}
+
+async fn count(&self) -> AppResult<u64> {
+    query::count(&self.db, TABLE).await
+}
+```
+
+Lato **service** ritorna `Paged<T>` (elementi + totale):
+
+```rust
+use crate::lib::pagination::{Paged, Pagination};
+
+pub async fn list_page(&self, pagination: Pagination) -> AppResult<Paged<PlaceResponse>> {
+    let total = self.repository.count().await?;
+    let places = self
+        .repository
+        .find_page(pagination.offset(), pagination.limit())
+        .await?;
+    Ok(Paged::new(places.into_iter().map(Into::into).collect(), total))
+}
+```
+
+Lato **controller** aggiungi l'estrattore `PaginationQuery` e chiama
+`into_response()`: la macro `#[route]` non cambia, il corpo resta l'array.
+
+```rust
+#[route]
+#[utoipa::path(
+    get,
+    path = "/api/places",
+    tag = "places",
+    params(
+        ("page" = Option<u64>, Query, description = "Pagina, 1-based (default 1)", example = 1),
+        ("limit" = Option<u64>, Query, description = "Elementi per pagina, 1-100 (default 20)", example = 20),
+    ),
+    responses(
+        (status = 200, description = "Lista paginata; totale in `X-TOTAL-LIST`",
+            body = [PlaceResponse],
+            headers(("X-TOTAL-LIST" = u64, description = "Totale elementi su tutte le pagine"))),
+        (status = 422, description = "Parametri di paginazione non validi", body = ValidationErrorResponse),
+        (status = 503, description = "Database unavailable", body = ErrorResponse),
+    ),
+)]
+pub async fn list_places(
+    State(service): State<Arc<PlaceService>>,
+    ValidatedQuery(pagination): ValidatedQuery<PaginationQuery>,
+) -> AppResult<Response> {
+    let page = service.list_page(pagination.pagination()).await?;
+    Ok(page.into_response())
+}
+```
+
+Note:
+
+- `page`/`limit` sono `Option` con default (`1` e `20`) applicati da
+  `Pagination::new`; il range è validato (`422` fuori range, `400` se non
+  numerici).
+- Più estrattori query convivono nello stesso handler: i filtri (es.
+  `?role=`) usano il proprio DTO (`ValidatedQuery<UserListQueryDto>`) accanto a
+  `ValidatedQuery<PaginationQuery>`.
+- L'ordinamento non è ancora implementato: senza `ORDER BY` l'ordine delle
+  pagine non è garantito.
+
+---
+
 ## 8. Il wiring della feature — `src/api/places/mod.rs`
 
 Questo file fa **due sole cose**: (1) dichiara i sottomoduli; (2) registra la
@@ -1236,6 +1322,7 @@ Swagger UI su `http://localhost:3000/swagger-ui` (spec a
 - [ ] aggiungi il repository in `src/db/mod.rs` (`Repositories` + `from_connection`) (§10)
 - [ ] collega `reports` (entity, dto, surreal repo, service, `order`) (§11)
 - [ ] se l'endpoint è protetto, `#[IsGranted]` + `security(...)` nel `utoipa::path` (§7-bis)
+- [ ] se l'endpoint è una lista paginata, `find_page`/`count` nel repo + `Paged<T>` nel service + `PaginationQuery` nel controller (§7-ter)
 - [ ] test + `cargo test`/`clippy`/`fmt` (§12–13)
 
 Ricapitolando i file **condivisi** toccati (e perché):
