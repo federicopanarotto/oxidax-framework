@@ -3,3 +3,4 @@ pub mod categories;
 pub mod places;
 pub mod reports;
 pub mod users;
+pub mod color;

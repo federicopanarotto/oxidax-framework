@@ -20,6 +20,8 @@ use crate::api::reports::report_repository::ReportRepository;
 use crate::api::reports::surreal_report_repository::SurrealReportRepository;
 use crate::api::users::surreal_user_repository::SurrealUserRepository;
 use crate::api::users::user_repository::UserRepository;
+use crate::api::color::color_repository::ColorRepository;
+use crate::api::color::surreal_color_repository::SurrealColorRepository;
 use crate::config::{Config, DbBackend};
 use crate::errors::AppResult;
 use crate::framework::register_repository;
@@ -33,6 +35,7 @@ pub struct Repositories {
     pub reports: Arc<dyn ReportRepository>,
     pub categories: Arc<dyn CategoryRepository>,
     pub places: Arc<dyn PlaceRepository>,
+    pub color: Arc<dyn ColorRepository>,
     pub users: Arc<dyn UserRepository>,
     pub user_identities: Arc<dyn UserIdentityRepository>,
 }
@@ -63,6 +66,7 @@ pub fn register_repositories(repositories: &Repositories, services: &mut Service
     register_repository(services, repositories.reports.clone());
     register_repository(services, repositories.categories.clone());
     register_repository(services, repositories.places.clone());
+    register_repository(services, repositories.color.clone());
     register_repository(services, repositories.users.clone());
     register_repository(services, repositories.user_identities.clone());
 }
@@ -77,6 +81,9 @@ async fn from_connection(db: Surreal<Any>) -> AppResult<Repositories> {
     let places = SurrealPlaceRepository::new(db.clone());
     places.ensure_schema().await?;
 
+    let color = SurrealColorRepository::new(db.clone());
+    color.ensure_schema().await?;
+
     let users = SurrealUserRepository::new(db.clone());
     users.ensure_schema().await?;
 
@@ -87,6 +94,7 @@ async fn from_connection(db: Surreal<Any>) -> AppResult<Repositories> {
         reports: Arc::new(reports),
         categories: Arc::new(categories),
         places: Arc::new(places),
+        color: Arc::new(color),
         users: Arc::new(users),
         user_identities: Arc::new(user_identities),
     })

@@ -11,3 +11,4 @@ mod places;
 mod service;
 mod support;
 mod users;
+mod color;
