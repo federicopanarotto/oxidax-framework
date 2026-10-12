@@ -1,299 +1,354 @@
-# riepilogo — axum-api (memoria di progetto)
+# Project memory — oxidax (working memory)
 
-> Memoria di lavoro consolidata. Fatti, convenzioni e decisioni del progetto:
-> serve a ripartire senza rileggere tutta la cronologia. Aggiornarla quando
-> cambia qualcosa di strutturale.
+> Consolidated working memory. Facts, conventions and decisions of the project:
+> it lets a new session restart without re-reading the whole history. Update it
+> whenever something structural changes.
 
-## Identità
+## Identity
 
-- **Cos'è**: framework personale (sperimentale) per scrivere API in Rust con lo
-  stile Express/Node portato in Rust. Non riscrive nulla da zero: **combina**
-  crate mature in una convenzione di progetto.
-- **Obiettivo**: aggiungere una feature = creare solo i suoi moduli. I file di
-  cablaggio principali (`features.rs`, `router.rs`, `docs.rs`) **non si toccano**.
-- **Lingua**: conversazione, `README.md`, `ADD-FEATURE.md` e questo file in
-  italiano; **commenti nel codice e messaggi di errore/log in inglese**
-  (le stringhe-dato dei test restano pure loro).
+- **What it is**: a personal (experimental) framework for writing APIs in Rust,
+  bringing the Express/Node development style to Rust. It rewrites nothing from
+  scratch: it **combines** mature crates into a project convention.
+- **Goal**: adding a feature = creating only its modules. The generic assembly
+  lives once in `oxidax-core` and is never touched.
+- **Language**: everything (conversation, docs, this file, code comments,
+  error/log messages) is in **English**. Test data strings stay as they are.
+
+## Workspace
+
+The repo is a Cargo workspace: reusable crates + the application.
+
+| Crate          | Role                                                                       |
+| -------------- | -------------------------------------------------------------------------- |
+| `oxidax-core`  | Reusable library: config, errors, auth, middleware, pagination, DI/route registries, DB helpers, generic assembly |
+| `oxidax-macro` | The `#[route]` proc-macro (consumes `#[IsGranted]`)                        |
+| `oxidax-cli`   | Task runner + code generator (`cargo xtask ...`, binary `oxidax-cli`)      |
+| `oxidax` (root)| The application: feature modules + thin composition                        |
+
+`Cargo.toml` (root): `package = "oxidax"`, `members = ["oxidax-core",
+"oxidax-macro", "oxidax-cli"]`, `default-members = ["."]`. The app depends on
+`oxidax-core` (path). The app's `src/lib.rs` re-exports the core so feature code
+keeps using `crate::lib::...`, `crate::framework::...`, `crate::errors::...`,
+`crate::config::...` unchanged:
+`pub use oxidax_core as lib; pub use oxidax_core::{config, errors, framework};`.
+`src/db.rs` re-exports `oxidax_core::db::{query, define_table, record_key_to_string}`.
 
 ## Stack
 
-| Tassello      | Scelta                                                     |
-| ------------- | ---------------------------------------------------------- |
-| HTTP/rotta    | `axum 0.8` (+ `tower`)                                     |
-| OpenAPI/UI    | `utoipa 6` + `utoipa-axum 0.3` + `utoipa-swagger-ui 10`    |
-| Rotte         | proc-macro propria `#[route]` (`framework-macros/`) + `inventory` |
-| Validazione   | `validator 0.21` (derive)                                  |
-| DI            | `more-di 3` (feature `async` → `Ref<T> = Arc<T>`)          |
-| DB            | `surrealdb 3.3` (`mem://` nei test)                        |
-| Auth          | `jsonwebtoken 11` (HS256) + `argon2 0.5` (Argon2id)         |
-| Errori        | `thiserror 2` + pipeline unificata                         |
-| Log           | `tracing` + `tracing-subscriber`                           |
-| Config        | `dotenvy 0.15` + variabili d'ambiente                      |
+| Building block | Choice                                                     |
+| -------------- | ---------------------------------------------------------- |
+| HTTP/route     | `axum 0.8` (+ `tower`)                                     |
+| OpenAPI/UI     | `utoipa 6` + `utoipa-axum 0.3` + `utoipa-swagger-ui 10`    |
+| Routes         | own `#[route]` proc-macro (`oxidax-macro/`) + `inventory`  |
+| Validation     | `validator 0.21` (derive)                                  |
+| DI             | `more-di 3` (feature `async` → `Ref<T> = Arc<T>`)          |
+| DB             | `surrealdb 3.3` (`mem://` in tests) — default backend, configurable |
+| Auth           | `jsonwebtoken 11` (HS256) + `argon2 0.5` (Argon2id)         |
+| Errors         | `thiserror 2` + unified pipeline                           |
+| Log            | `tracing` + `tracing-subscriber`                           |
+| Config         | `dotenvy 0.15` + environment variables                     |
+
+The app dropped `utoipa-swagger-ui`, `jsonwebtoken`, `argon2` (they now live in
+`oxidax-core`). The app keeps `utoipa-axum`, `inventory`, `more-di` because the
+macro-generated code refers to them by name (`utoipa_axum`, `inventory`, `di`).
 
 ## Layout
 
 ```
-src/
-├── main.rs            # entry point: dotenv → tracing → Config::from_env → build → bind → serve (commentato fase per fase)
-├── lib.rs             # pub mod api/config/db/errors/framework + #[path="lib/mod.rs"] pub mod lib
-├── framework.rs       # facade per le feature: use crate::framework::*
-├── config.rs          # Config::from_env() (env/.env, nessun default) + Config::memory()
-├── lib/               # "core" del framework
-│   ├── registry.rs    # registri statici Feature (DI) e Route + register_repository
-│   ├── validators.rs  # format_validation_errors, not_blank, validate_uuid
-│   ├── auth/          # auth core (ordine 0): jwt, password, user_identity,
-│   │                   #   identity_repository (trait + surreal), extractor, guard, mod
-│   └── middlewares/
-│       ├── validation_middleware.rs  # ValidatedJson/Query/Params + ValidationErrorResponse
-│       └── access_log.rs             # log richieste "POST /api/x 200 3ms"
+oxidax-core/src/
+├── lib.rs             # modules: app, auth, config, db, docs, errors, framework,
+│                      #   middlewares, pagination, registry, validators + pub use validator::Validate
+├── app.rs             # assemble(config, AppInfo, register_repositories) → (Router, ServiceProvider)
+├── docs.rs            # ApiDoc (security scheme accessToken) + build + swagger_router
+├── config.rs          # Config::from_env() (env/.env, no default) + Config::memory()
+├── framework.rs       # facade for features: `use crate::framework::*` + `pub use oxidax_macro::route`
+├── registry.rs        # static Feature (DI) and Route registries + register_repository
+├── validators.rs      # format_validation_errors, not_blank, validate_uuid
+├── pagination.rs      # PaginationQuery + Pagination + Paged<T> (X-TOTAL-LIST)
+├── auth/              # auth core (order 0): jwt, password, user_identity,
+│                      #   identity_repository (trait + surreal), extractor, guard, mod
+├── middlewares/
+│   ├── validation_middleware.rs  # ValidatedJson/Query/Params
+│   └── access_log.rs             # "POST /api/x 200 3ms" request log
 ├── errors/            # AppError, ErrorResponse, BadRequestResponse, pipeline::respond, fallback 404
-├── db/                # surreal.rs (connect/define_table/record_key_to_string) + mod.rs (Repositories)
+└── db/                # surreal.rs (connect/define_table/record_key_to_string) + query.rs + mod.rs
+
+oxidax-macro/src/lib.rs  # #[route] proc-macro (consumes #[IsGranted])
+oxidax-cli/src/          # main.rs (tasks) + generate.rs (new-feature generator)
+
+src/                     # the application
+├── main.rs             # dotenv → tracing → Config::from_env → app::build → bind → serve
+├── lib.rs              # pub mod api/app/db + re-exports of oxidax-core (lib/config/errors/framework)
+├── app.rs              # build() / build_with_provider() / info() (title "Oxidax API")
+├── db.rs               # Repositories + repositories() + memory_repositories()
+│                       #   + register_repositories() (central DI) + from_connection()
 └── api/
-    ├── mod.rs         # dichiarazione moduli feature (una riga per feature)
-    ├── features.rs    # GENERICO: provider(config) + route_bundles(&provider)
-    ├── router.rs      # GENERICO: merge rotte + health + swagger + fallback + access_log
-    ├── docs.rs        # GENERICO: build OpenApi da frammenti + swagger_router
-    │                  #   + scheme accessToken (HTTP bearer JWT, unica modifica one-time)
-    ├── categories/    # feature: entity, dto, repository, surreal_*, service, controller, mod
-    ├── places/        # feature: city, address, cap, provenance
-    ├── reports/       # feature (order 3): dipende da categories, places e users
-    ├── users/         # feature (order 2): /api/users/me, /api/users (admin)
-    └── auth/          # feature (order 4): register/login/refresh/logout
-framework-macros/      # proc-macro #[route] (consuma #[IsGranted])
-tests/report/          # integration test HTTP reali (backend mem://), auth + creator inclusi
-ADD-FEATURE.md         # guida: come aggiungere una feature (esempio Places)
+    ├── mod.rs          # feature module declarations (one line per feature)
+    ├── categories/     # feature: entity, dto, repository, surreal_*, service, controller, mod
+    ├── places/         # feature: city, address, cap, provenance
+    ├── reports/        # feature (order 3): depends on categories, places and users
+    ├── users/          # feature (order 2): /api/users/me, /api/users (admin)
+    └── auth/           # feature (order 4): register/login/refresh/logout
+
+tests/report/           # end-to-end HTTP integration tests (mem:// backend)
+README.md               # English project overview
+ADD-FEATURE.md          # English step-by-step guide to add a feature (example: Places)
 ```
 
-## Architettura
+## Architecture
 
-### Routing + OpenAPI zero-touch
-- `#[route]` (in `framework-macros`) va messo **sopra** `#[utoipa::path(...)]`.
-  Espande: handler invariato + `fn __build_route_<handler>(&ServiceProvider) ->
-  (Router, OpenApi)` + `inventory::submit!`.
-- Requisiti controllati a compile-time: presenza di `#[utoipa::path]` e di un
-  argomento `State<Arc<T>>` (da cui ricava `T`).
-- Path **assoluti** (`/api/...`) dichiarati in `#[utoipa::path]`: niente `nest`.
-- `router.rs` unisce i `route_bundles`, monta `/api/health`, la Swagger UI e il
-  fallback, e applica outermost l'`access_log`.
-- Niente export `docs/openapi.json`: spec servita live su `/api-docs/openapi.json`,
-  UI su `/swagger-ui`.
+### Zero-touch routing + OpenAPI
+- `#[route]` (in `oxidax-macro`) must go **above** `#[utoipa::path(...)]`.
+  It expands to: unchanged handler + `fn __build_route_<handler>(&ServiceProvider)
+  -> (Router, OpenApi)` + `inventory::submit!`. Emitted paths point to
+  `oxidax_core::...`.
+- Compile-time requirements: presence of `#[utoipa::path]` and a
+  `State<Arc<T>>` argument (from which it derives `T`).
+- **Absolute** paths (`/api/...`) declared in `#[utoipa::path]`: no `nest`.
+- `oxidax_core::app::assemble` builds the provider, merges the route bundles,
+  mounts `/api/health`, the Swagger UI and the fallback, and applies `access_log`
+  as the outermost layer.
+- No `docs/openapi.json` export: the spec is served live at
+  `/api-docs/openapi.json`, UI at `/swagger-ui`.
 
 ### Dependency injection
-- Registri statici in `lib/registry.rs`: `Feature { order, register }` (solo DI:
-  repo + service) e `Route { build }` (una per handler), entrambi con
-  `inventory::collect!`.
-- Ogni feature: `inventory::submit! { Feature::new(order, register) }` nel `mod.rs`;
-  `register` fa `register_repository(services, repositories.X.clone())` +
-  `services.add(XService::singleton())`.
-- `#[injectable]` (more-di) genera il costruttore; i campi sono `Arc<...>`.
-  Serve `use di::Injectable;` per `.singleton()`.
-- **Order attuale**: categories = 0, places = 1, users = 2, reports = 3,
-  auth = 4 (dipendenze prima); `lib/auth` core = ordine 0 (registra identity
-  repo + `JwtConfig` lazy da `Arc<Config>`). L'iniezione è lazy, quindi
-  l'ordine è una cintura di sicurezza.
+- Static registries in `oxidax-core/src/registry.rs`: `Feature { order, register:
+  fn(&mut ServiceCollection) }` (services only) and `Route { build }` (one per
+  handler), both with `inventory::collect!`.
+- **Centralized repository registration**: the app registers every concrete
+  repository in `src/db.rs::register_repositories(&Repositories, &mut
+  ServiceCollection)` (via `register_repository(services, repositories.X.clone())`);
+  this closure is passed to `oxidax_core::app::assemble`. Features never know the
+  concrete repositories, only the `...Repository` traits.
+- Each feature: `inventory::submit! { Feature::new(order, register) }` in `mod.rs`;
+  `register` only does `services.add(XService::singleton())`.
+- `#[injectable]` (more-di) generates the constructor; fields are `Arc<...>`.
+  `use di::Injectable;` is needed for `.singleton()`.
+- **Current order**: auth core = 0, categories = 0, places = 1, users = 2,
+  reports = 3, auth = 4 (dependencies first); `oxidax_core::auth` core = order 0
+  (registers the identity repo + lazy `JwtConfig` from `Arc<Config>`). Injection
+  is lazy, so the order is a safety belt.
 
-### Flusso di una richiesta
-`access_log` → router axum → (rotte con `#[IsGranted]`: guard bearer → estende
-`CurrentUser`) → extractor (`State`/`ValidatedJson`) → handler →
-service → repository → SurrealDB. Errori e validazione risalgono come `AppError`
-o `ValidationErrorResponse`.
+### Request flow
+`access_log` → axum router → (routes with `#[IsGranted]`: bearer guard → extends
+`CurrentUser`) → extractor (`State`/`ValidatedJson`) → handler → service →
+repository → SurrealDB. Errors and validation bubble up as `AppError` or as the
+validation extractor's `ErrorResponse`.
 
-### Autenticazione (JWT)
-- `src/lib/auth/` è il "core" (feature order 0): **non** dipende dalle feature
-  users/auth (niente coupling feature↔feature); registra `UserIdentityRepository`
-  e `JwtConfig` (lazy da `Arc<Config>`: `JWT_SECRET`, `ACCESS_TOKEN_DURATION`,
-  `REFRESH_TOKEN_DURATION`).
-- Token: access breve + refresh lungo e **monouso** (jti in
-  `user_identity.refresh_jti`; rotazione a ogni refresh, `clear_refresh` al
-  logout → 401). `verify_*` usa `jsonwebtoken` (default `leeway: 60`,
-  `validate_exp: true`).
-- Password: argon2 (`hash`/`verify` fail-closed) in `lib/auth/password.rs`.
-- `#[IsGranted]` / `#[IsGranted(["admin"])]` va **sotto** `#[route]`: la macro
-  aggiunge il layer guard sulla singola rotta (`from_fn_with_state`) e fa
-  shadow di `__router`; senza attributo la rotta è pubblica e non dipende da
-  `JwtConfig`. Guard → `401`/`403`, poi estende `CurrentUser`
-  (`user_id`, `identity_id`, `role`), estrattore in `framework`.
-- Tabelle: `user` (ruoli `ROLE_USER`/`ROLE_ADMIN`) + `user_identity`
-  (provider/identifier/password_hash + refresh jti/exp). Admin creato a mano
-  sul DB (register forza `role = user`).
-- Errori generici anti-enumeration: login 401 identico per email ignota o
-  password sbagliata; register duplicato `409 registration could not be
-  completed`; refresh `401 invalid or expired refresh token`.
-- Register su 2 tabelle non transazionale → compensazione manuale (rimuove
-  l'utente se fallisce l'identity, `tracing::warn` se fallisce il rollback).
-- Swagger: scheme `accessToken`/`refreshToken` (`utoipa::Modify` in `docs.rs`,
-  HTTP bearer JWT); ogni handler protetto dichiara `security(...)` e 401/403.
+### Authentication (JWT)
+- `oxidax-core/src/auth/` is the "core" (order 0): it does **not** depend on the
+  users/auth features (no feature↔feature coupling); it registers
+  `UserIdentityRepository` and `JwtConfig` (lazy from `Arc<Config>`: `JWT_SECRET`,
+  `ACCESS_TOKEN_DURATION`, `REFRESH_TOKEN_DURATION`).
+- Tokens: short access + long **single-use** refresh (jti in
+  `user_identity.refresh_jti`; rotated on every refresh, `clear_refresh` on logout
+  → 401). `verify_*` uses `jsonwebtoken` (default `leeway: 60`, `validate_exp: true`).
+- Password: argon2 (`hash`/`verify` fail-closed) in `auth/password.rs`.
+- `#[IsGranted]` / `#[IsGranted(["admin"])]` goes **below** `#[route]`: the macro
+  adds the guard layer on the single route (`from_fn_with_state`) and shadows
+  `__router`; without the attribute the route is public and does not depend on
+  `JwtConfig`. Guard → `401`/`403`, then extends `CurrentUser` (`user_id`,
+  `identity_id`, `role`), extractor in `framework`.
+- Tables: `user` (roles `ROLE_USER`/`ROLE_ADMIN`) + `user_identity`
+  (provider/identifier/password_hash + refresh jti/exp). The admin is created by
+  hand in the DB (register forces `role = user`).
+- Anti-enumeration generic errors: login 401 identical for unknown email or wrong
+  password; duplicate register `409 registration could not be completed`; refresh
+  `401 invalid or expired refresh token`.
+- Register spans 2 tables non-transactionally → manual compensation (removes the
+  user if the identity fails, `tracing::warn` if the rollback fails).
+- Swagger: scheme `accessToken` (`utoipa::Modify` in `oxidax-core/src/docs.rs`,
+  HTTP bearer JWT); each protected handler declares `security(...)` and 401/403.
+  (The auth refresh handler references `refreshToken`, but only `accessToken` is
+  currently declared in the spec — a known gap.)
 
-### Contratto errori
-- Dominio/pipeline: `{code, error, message}` con status giusto
-  (`not_found` 404, `validation_error` 400, `database_unavailable` 503,
-  `internal_error` 500).
-- Validazione (extractor): `{error, details}` con 422; body/query malformati → 400
-  (`{"error":"Validation error on Body", "details":[...]}`).
-- Nei 400 dei write method lo schema è `BadRequestResponse` = `oneOf`
-  (`ErrorResponse` | `ValidationErrorResponse`), definito a mano con
-  `OneOfBuilder` + `Ref::from_schema_name` (non esiste `one_of` per struct).
+### Error contract
+- Domain/pipeline: `{code, error, message}` with the right status
+  (`not_found` 404, `validation_error` 400, `conflict` 409, `unauthorized` 401,
+  `forbidden` 403, `database_unavailable` 503, `internal_error` 500).
+- Validation extractor: invalid fields → **422** code `validation_error` (details
+  joined into `message`); malformed/unparsable body/query/params → **400** code
+  `bad_request`. Same `ErrorResponse` shape as everything else.
+- In the write-method 400s the OpenAPI schema is `BadRequestResponse`, an **alias**
+  of `ErrorResponse` (`Ref::from_schema_name("ErrorResponse")`), doc-only.
 
-### Validazione
-- `ValidatedJson`/`ValidatedQuery`/`ValidatedParams` (`T: DeserializeOwned + Send + Validate`):
-  deserializzano e validano **prima** dell'handler.
-- DTO con `#[derive(Validate)]` e `#[validate(custom = not_blank, length(max=...))]`;
-  `validate_uuid` sugli `Option<String>` id.
-- DTO di query: `XxxQueryDto` (es. `UserListQueryDto`) + `ValidatedQuery<...>`;
-  i valori ammessi da un enum si validano con un custom validator locale al
-  modulo (`validate_role`, feature-local: usa le costanti di `user_entity`).
-- `into_entity()` nei DTO: genera l'uuid e fa `.trim()` → il service riceve dati pronti.
+### Validation
+- `ValidatedJson`/`ValidatedQuery`/`ValidatedParams` (`T: DeserializeOwned + Send
+  + Validate`): deserialize and validate **before** the handler.
+- DTOs use `#[derive(Validate)]` and `#[validate(custom = not_blank, length(max=...))]`;
+  `validate_uuid` on `Option<String>` id fields.
+- Query DTOs: `XxxQueryDto` (e.g. `UserListQueryDto`) + `ValidatedQuery<...>`;
+  enum-like allowed values are validated with a module-local custom validator
+  (`validate_role`, feature-local: uses `user_entity` constants).
+- `into_entity()` in the DTOs: generates the uuid and `.trim()`s → the service
+  receives ready-made data.
 
 ### Access log
-- `lib/middlewares/access_log.rs` (`axum::middleware::from_fn`): `tracing::info!`
-  con formata `METODO path status elapsed_ms` (es. `POST /api/reports 201 3ms`),
-  status come `as_u16()`, path+query.
+- `oxidax-core/src/middlewares/access_log.rs` (`axum::middleware::from_fn`):
+  `tracing::info!` formatted as `METHOD path status elapsed_ms` (e.g.
+  `POST /api/reports 201 3ms`), status via `as_u16()`, path+query.
 
-### Configurazione
-- `Config::from_env()` carica `.env` (`dotenvy::dotenv().ok()`, le env esistenti
-  vincono) e legge **tutte** le variabili **senza default** (helper `required`
-  → panico esplicito se manca).
-- Variabili: `SERVER_ADDR`, `DB_BACKEND` (`surreal` | `memory`), `SURREAL_URL`,
+### Configuration
+- `Config::from_env()` loads `.env` (`dotenvy::dotenv().ok()`, existing env vars
+  win) and reads **all** variables with **no default** (helper `required` →
+  explicit panic if missing).
+- Variables: `SERVER_ADDR`, `DB_BACKEND` (`surreal` | `memory`), `SURREAL_URL`,
   `SURREAL_NS`, `SURREAL_DB`, `SURREAL_USER`, `SURREAL_PASS`, `JWT_SECRET`,
   `ACCESS_TOKEN_DURATION` (900), `REFRESH_TOKEN_DURATION` (604800).
-- `.env` è git-ignorato; `.env.example` è il template. `main.rs` carica il dotenv
-  **prima** del setup tracing (così `RUST_LOG` dal file vale).
-- `Config::memory()` usa il backend memory (test) ma legge il resto dall'ambiente.
+- `.env` is git-ignored; `.env.example` is the template. `main.rs` loads dotenv
+  **before** setting up tracing (so `RUST_LOG` from the file applies).
+- `Config::memory()` uses the memory backend (tests) but still reads the rest from
+  the environment.
 
-## Feature e modello dati
+## Features and data model
 
-| Feature    | Order | Tabella          | Note                                                        |
-| ---------- | ----- | ---------------- | ----------------------------------------------------------- |
-| (auth core)| 0     | `user_identity`  | `src/lib/auth`: JWT, password, guard, `CurrentUser`          |
-| categories | 0     | `category`       | CRUD `/api/categories`                                       |
-| places     | 1     | `place`          | CRUD `/api/places` (city, address, cap, provenance)         |
-| users      | 2     | `user`           | `GET /api/users/me`; `GET /api/users?role=` (solo admin)     |
-| reports    | 3     | `report`         | CRUD `/api/reports`; creatore + relazioni con categories/places |
-| auth       | 4     | —                | register/login/refresh/logout (`/api/auth/*`)                |
+| Feature     | Order | Table           | Notes                                                       |
+| ----------- | ----- | --------------- | ----------------------------------------------------------- |
+| (auth core) | 0     | `user_identity` | `oxidax_core::auth`: JWT, password, guard, `CurrentUser`     |
+| categories  | 0     | `category`      | CRUD `/api/categories`                                       |
+| places      | 1     | `place`         | CRUD `/api/places` (city, address, cap, provenance)          |
+| users       | 2     | `user`          | `GET /api/users/me`; `GET /api/users?role=` (admin only)     |
+| reports     | 3     | `report`        | CRUD `/api/reports`; creator + relations to categories/places |
+| auth        | 4     | —               | register/login/refresh/logout (`/api/auth/*`)                |
 
-- `Report` (entity) ha `category_id: Option<String>`, `place_id: Option<String>`
-  e `user_id: Option<String>` (creatore; `None` solo sulle righe legacy).
-- Il creatore **non sta nei DTO di richiesta**: arriva dal token
+- `Report` (entity) has `category_id: Option<String>`, `place_id: Option<String>`
+  and `user_id: Option<String>` (creator; `None` only on legacy rows).
+- The creator is **not** in the request DTOs: it comes from the token
   (`#[IsGranted]` → `CurrentUser.user_id` → `service.create(&user_id, dto)`).
-- In **risposta** NON si espongono gli `*_id`: solo gli oggetti annidati
-  `category`, `place` e `created_by` (`Option<UserSummaryResponse>` — id,
-  nome, cognome, ruolo: **nessun campo email**, nemmeno `null`). L'email resta
-  solo per `/me` e per la lista admin (`UserResponse` con `email`).
-- `GET /api/users` accetta il query param **`role`** (`admin`/`user`): DTO
-  `UserListQueryDto` validato da `ValidatedQuery` (valore fuori elenco → **422**
-  con `details` sul campo `role`); il filtro arriva al repository
-  (`find_by_role`, `WHERE role = $value`) solo per valori già validati. La guard
-  admin gira **prima** dell'extractor → un non-admin vede sempre 403.
-- I write method dei report (`POST`, `PUT`, `DELETE`) sono protetti
-  (`#[IsGranted]` + 401/security in OpenAPI); le letture restano pubbliche e
-  comunque riportano `created_by`.
-- `ReportService` valida l'esistenza di category/place (→ 400
-  `validation_error`), non valida il creatore (è appena verificato dal
-  guard; se l'utente sparisce la decorazione degrada a `null`) e "decora"
-  il singolo via `find` e le liste via `by_id()` (index `HashMap`, no N+1);
-  inietta `UserService` (service → service).
-- `replace` dei report è un **merge** con patch senza `user_id`: l'update non
-  può mai riscrivere il creatore.
+- Responses do **not** expose the `*_id` fields: only the nested objects
+  `category`, `place` and `created_by` (`Option<UserSummaryResponse>` — id,
+  firstname, lastname, role: **no email field**, not even `null`). Email stays
+  only for `/me` and the admin list (`UserResponse` with `email`).
+- `GET /api/users` accepts the **`role`** query param (`admin`/`user`): DTO
+  `UserListQueryDto` validated by `ValidatedQuery` (value outside the list → **422**
+  with details on the `role` field); the filter reaches the repository
+  (`find_by_role`, `WHERE role = $value`) only for already-validated values. The
+  admin guard runs **before** the extractor → a non-admin always sees 403.
+- The report write methods (`POST`, `PUT`, `DELETE`) are protected
+  (`#[IsGranted]` + 401/security in OpenAPI); reads stay public and still report
+  `created_by`.
+- `ReportService` validates the existence of category/place (→ 400
+  `validation_error`), does not validate the creator (just verified by the guard;
+  if the user disappears the decoration degrades to `null`) and "decorates" the
+  single item via `find` and lists via `by_id()` (`HashMap` index, no N+1);
+  it injects `UserService` (service → service).
+- `replace` of reports is a **merge** patch without `user_id`: an update can never
+  rewrite the creator.
+- **Pagination (reusable)**: lists accept optional `?page=` (default 1) and
+  `?limit=` (default 20, max 100) via `ValidatedQuery<PaginationQuery>`; the body
+  stays the JSON array and the total travels in the `X-TOTAL-LIST` header
+  (`Paged<T>`, `oxidax-core/src/pagination.rs` + `db/query.rs`). Out of range →
+  422; non-numeric → 400.
 
-## Convenzioni (da rispettare)
+## Conventions (to respect)
 
-1. Commenti e messaggi API/log in **inglese**; docs di progetto in italiano.
-2. **1 handler = 1 service**; il controller è solo trasporto (niente logica).
-   Logica multi-servizio → service che orchestra altri service (grafo aciclico).
-3. Le response non espongono gli id delle relazioni, solo l'oggetto annidato.
-4. Nuova feature = suoi moduli + `pub mod X;` in `src/api/mod.rs` +
-   repository in `src/db/mod.rs` (`Repositories` + `from_connection` +
-   `ensure_schema`) + `Feature::new(order, register)`. Altro è automatico.
-5. `#[route]` sempre **sopra** `#[utoipa::path]`; handler con `State<Arc<T>>`.
-6. Path assoluti negli attributi utoipa; niente `nest("/api")`.
-7. Niente export di `openapi.json`; solo UI live.
-8. Rotte protette: `#[IsGranted]` **sotto** `#[route]` e sotto
-   `#[utoipa::path]`; handler protetti con estrattore `CurrentUser`; in
-   `utoipa::path` `security(...)` + 401/403 documentati.
-9. Auth: email = identifier; risposte generiche per login/register (no
-   enumerazione); refresh monouso.
-10. Query param: DTO `XxxQueryDto` + `ValidatedQuery<...>`; i valori ammessi
-    si validano con un custom validator (locale al modulo se legato al dominio).
+1. Comments, API/log messages and docs in **English**.
+2. **1 handler = 1 service**; the controller is transport only (no logic).
+   Multi-service logic → a service orchestrating other services (acyclic graph).
+3. Responses do not expose relation ids, only the nested object.
+4. New feature = its modules + `pub mod X;` in `src/api/mod.rs` + repository in
+   `src/db.rs` (`Repositories` + `register_repositories` + `from_connection` +
+   `ensure_schema`) + `Feature::new(order, register)` (service only). Everything
+   else is automatic. (`cargo xtask new-feature` does all of this.)
+5. `#[route]` always **above** `#[utoipa::path]`; handlers with `State<Arc<T>>`.
+6. Absolute paths in utoipa attributes; no `nest("/api")`.
+7. No `openapi.json` export; live UI only.
+8. Protected routes: `#[IsGranted]` **below** `#[route]` and below
+   `#[utoipa::path]`; protected handlers use the `CurrentUser` extractor; in
+   `utoipa::path` declare `security(...)` + documented 401/403.
+9. Auth: email = identifier; generic login/register responses (no enumeration);
+   single-use refresh.
+10. Query params: `XxxQueryDto` + `ValidatedQuery<...>`; allowed values validated
+    with a custom validator (module-local when domain-bound).
 
-## Stato e verifica
+## Status and verification
 
-- **Test**: 37 integration (HTTP reali, backend `mem://`: 13 in `auth.rs`,
-  5 in `crud.rs`, 5 in `categories.rs`, 4 in `places.rs`, 4 in `service.rs`,
-  3 in `creator.rs`, 2 in `users.rs`, 1 in `docs.rs`) + 1 doctest (facade).
-  Verificati in sessione anche 27/27 di E2E sul SurrealDB **reale** (query
-  `role`, created_by senza email, PUT/DELETE protetti).
-- `cargo clippy --all-targets -- -D warnings` e `cargo fmt` puliti.
-- `git`: branch `main`, working tree **non pulito** (feature "report con
-  creatore" + query param `role` + protezione PUT/DELETE report, con docs da
-  committare). Ultimo commit
-  `cb251d4 chore: remove refreshToken documentation from security schemes in OpenAPI spec`.
-- **Porta 3000 occupata**: è il server debug dell'utente dentro il container
-  (publish Docker) — non toccare; i server temporanei usano altre porte.
-- **Non committare senza richiesta esplicita dell'utente.**
+- **Tests**: 40 integration tests over real HTTP with the `mem://` backend —
+  `auth.rs` 13, `categories.rs` 5, `crud.rs` 5, `places.rs` 4, `service.rs` 4,
+  `creator.rs` 3, `users.rs` 3, `pagination.rs` 2, `docs.rs` 1.
+  `cargo test --workspace` → 40 passed.
+- `cargo check --workspace --all-targets`, `cargo clippy --workspace --all-targets
+  -- -D warnings` and `cargo fmt --all` all clean.
+- The `new-feature` generator was verified end-to-end: it scaffolds a compiling
+  feature whose generated CRUD test passes; the test feature was then removed and
+  the shared files restored.
+- `git`: branch `main`, working tree **not clean** (the whole workspace split
+  `oxidax-core`/`oxidax-macro`/`oxidax-cli` + app rename to `oxidax` + docs
+  translation, not yet committed). Last commit:
+  `53abf46 refactor: unify error response structure and remove ValidationErrorResponse`.
+- **Port 3000 busy**: it is the user's debug server inside the container (Docker
+  publish) — do not touch; temporary servers use other ports.
+- **Do not commit without an explicit user request.**
 
-## Comandi (dev container)
+## Commands (dev container)
 
-Sempre come utente `vscode` (vedi Gotchas):
+Always as user `vscode` (see Gotchas). Replace `<container>` with your dev
+container name (the `docker-compose` service is `app`):
 
 ```bash
-docker exec -u vscode -w /workspace axum-api_devcontainer-app-1 cargo check --all-targets
-docker exec -u vscode -w /workspace axum-api_devcontainer-app-1 cargo fmt
-docker exec -u vscode -w /workspace axum-api_devcontainer-app-1 cargo clippy --all-targets -- -D warnings
-docker exec -u vscode -w /workspace axum-api_devcontainer-app-1 cargo test
+docker exec -u vscode -w /workspace <container> cargo check --workspace --all-targets
+docker exec -u vscode -w /workspace <container> cargo fmt --all
+docker exec -u vscode -w /workspace <container> cargo clippy --workspace --all-targets -- -D warnings
+docker exec -u vscode -w /workspace <container> cargo test --workspace
 ```
 
-Avvio locale: `cp .env.example .env`; poi `DB_BACKEND=memory cargo run` (senza
-Surreal) o `cargo run` (SurrealDB da `.env`). UI: http://localhost:3000/swagger-ui.
+When running inside the Dev Container directly, just use `cargo ...`.
+
+Aliases (`.cargo/config.toml`): `cargo dev`, `cargo dev-check`, `cargo xtask
+<task>`, `cargo new-feature`, `cargo docker-{build,save,package,run,stop}`.
+
+Run locally: `cp .env.example .env`; then `DB_BACKEND=memory cargo run` (no Surreal)
+or `cargo run` (SurrealDB from `.env`). UI: http://localhost:3000/swagger-ui.
 
 ## Gotchas
 
-- **Permessi `/cargo-target`**: compilare da terminale host con `-u vscode`
-  (come sopra). Lanciare cargo come root crea file di proprietà mista →
-  `Permission denied (os error 13)` sui `.fingerprint` in VS Code. Fix:
+- **`/cargo-target` permissions**: compile from the host terminal with `-u vscode`
+  (as above). Running cargo as root creates mixed-ownership files →
+  `Permission denied (os error 13)` on `.fingerprint` files in VS Code. Fix:
   `chown -R vscode:vscode /cargo-target`.
-- **rust-analyzer su host Windows** mostra falsi errori tipo
-  `expected (), found ({unknown}, {unknown}, {unknown})` sulle macro: l'host non
-  vede le crate del container. Compila comunque; per RA corretto aprire nel
+- **rust-analyzer on the Windows host** shows false errors like
+  `expected (), found ({unknown}, {unknown}, {unknown})` on macros: the host does
+  not see the container crates. It still compiles; for correct RA, open in the
   Dev Container.
-- Le tabelle SurrealDB 3 non nascono da sole: serve `ensure_schema` →
-  `DEFINE TABLE IF NOT EXISTS ... SCHEMALESS` (helper `db::define_table`).
-- **Lo schema del DB reale lo possiede solo `ensure_schema`**: `DEFINE FIELD`
-  aggiunti a mano (console/Studio) entrano in conflitto con il codice e
-  rompono le scritture con `503 Couldn't coerce ... Expected uuid/record<> but
-  found '...'` (i test `mem://` non lo vedono perché il DB è pulito). Sintomi:
-  place/category/report non si creano, auth/user ok. Fix: `REMOVE FIELD ...`
-  (i dati restano). Verificato il 2026-10-08: 11 field manuali rimossi da
-  `test/reports`, E2E 15/15 sul DB reale.
-- **Studio può creare tabelle `SCHEMAFULL`** (designer di tabella): senza
-  campi definiti le scritture vengono rifiutate con
-  `503 Found field 'x', but no such field exists for table 'y'` (register o
-  login rotti). `DEFINE TABLE IF NOT EXISTS ... SCHEMALESS` **non** corregge
-  una tabella esistente: serve `ALTER TABLE <t> SCHEMALESS` (i dati restano).
-  Verificato il 2026-10-08 su `test/reports` (`user_identity`).
-- `#[utoipa::path]` accetta solo funzioni libere, non metodi; quindi niente
-  classi controller.
-- I custom validator di `validator` devono ritornare `Result<(), ValidationError>`.
-- **SurrealDB 3** ha rinominato `type::thing` → **`type::record`**: nei SQL
-  manuali (console/HTTP) `type::thing(...)` dà parse error
+- SurrealDB 3 tables are not created automatically: `ensure_schema` is required →
+  `DEFINE TABLE IF NOT EXISTS ... SCHEMALESS` (helper `db::define_table`, in
+  `oxidax-core`).
+- **Only `ensure_schema` owns the real DB schema**: `DEFINE FIELD`s added by hand
+  (console/Studio) conflict with the code and break writes with
+  `503 Couldn't coerce ... Expected uuid/record<> but found '...'` (the `mem://`
+  tests do not see it because the DB is clean). Symptoms: place/category/report
+  cannot be created, auth/user fine. Fix: `REMOVE FIELD ...` (data is kept).
+  Verified 2026-10-08: 11 manual fields removed from `test/reports`, E2E 15/15 on
+  the real DB.
+- **Studio can create `SCHEMAFULL` tables** (table designer): with no defined
+  fields, writes are rejected with `503 Found field 'x', but no such field exists
+  for table 'y'` (register or login broken). `DEFINE TABLE IF NOT EXISTS ...
+  SCHEMALESS` does **not** fix an existing table: use `ALTER TABLE <t> SCHEMALESS`
+  (data is kept). Verified 2026-10-08 on `test/reports` (`user_identity`).
+- `#[utoipa::path]` only accepts free functions, not methods; hence no controller
+  classes.
+- `validator` custom validators must return `Result<(), ValidationError>`.
+- **SurrealDB 3** renamed `type::thing` → **`type::record`**: in manual SQL
+  (console/HTTP) `type::thing(...)` gives the parse error
   `Invalid function/constant path, did you maybe mean type::record`.
-- I test si appoggiano al `.env` (perché `Config::from_env` richiede le variabili):
-  su ambienti senza `.env` vanno passate le env o copiato `.env.example`.
+- The tests rely on `.env` (because `Config::from_env` requires the variables): on
+  environments without `.env`, pass the env vars or copy `.env.example`.
 
-## Decisioni scartate (perché)
+## Rejected decisions (and why)
 
-- `service-rs` → richiede nightly (`#![feature(unsize)]`): scartato.
-- Container DI manuale (`src/di.rs`) → troppo boilerplate: sostituito da `more-di`.
-- `Inject<T>` / più service direttamente nell'handler: **no di default** — il
-  service fa tutta la logica e il controller ne chiama una funzione; al più
-  valvola di sfogo per endpoint di sola aggregazione (YAGNI per ora).
+- `service-rs` → requires nightly (`#![feature(unsize)]`): rejected.
+- Manual DI container (`src/di.rs`) → too much boilerplate: replaced by `more-di`.
+- `Inject<T>` / multiple services directly in the handler: **no by default** — the
+  service holds all the logic and the controller calls one function; at most an
+  escape hatch for aggregation-only endpoints (YAGNI for now).
 
 ## Backlog
 
-- Paginazione/ordinamento e utility condivise tra feature.
-- Eventuale rendering della relazione tramite `oneOf`/`$ref` più ricco in OpenAPI.
-- Eventuale `db/mod.rs` zero-touch (registro dinamico dei repository) per togliere
-  l'ultima modifica manuale condivisa.
-- Test e2e su backend Surreal reale (oggi coperto solo `mem://`).
-- Eventuali altri middleware "stile Express" oltre all'access log e al guard
-  per-rotta (es. rate limiting).
-- Committare solo su richiesta esplicita.
+- `?sort=` (ordering) with a per-entity field whitelist — **not essential**.
+- Richer relation rendering via `oneOf`/`$ref` in OpenAPI.
+- Zero-touch `src/db.rs` (dynamic repository registry) to remove the last manual
+  shared edit.
+- E2E tests on a real SurrealDB backend (today only `mem://` is covered).
+- More "Express style" middleware beyond the access log and the per-route guard
+  (e.g. rate limiting, CORS, request id).
+- Commit only on explicit request.

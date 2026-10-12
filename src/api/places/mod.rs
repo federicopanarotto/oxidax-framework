@@ -8,14 +8,13 @@ pub mod surreal_place_repository;
 use di::Injectable;
 use di::ServiceCollection;
 
-use crate::db;
-use crate::framework::{Feature, register_repository};
+use crate::framework::Feature;
 use place_service::PlaceService;
 
 // All the DI wiring lives here; every route is auto-registered by `#[route]`
-// on the handlers in `place_controller`.
-fn register(repositories: &db::Repositories, services: &mut ServiceCollection) {
-    register_repository(services, repositories.places.clone());
+// on the handlers in `place_controller`. The repository is registered centrally
+// in `crate::db`.
+fn register(services: &mut ServiceCollection) {
     services.add(PlaceService::singleton());
 }
 

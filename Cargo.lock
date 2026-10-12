@@ -237,33 +237,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "axum-api"
-version = "0.1.0"
-dependencies = [
- "argon2",
- "async-trait",
- "axum",
- "dotenvy",
- "framework-macros",
- "inventory",
- "jsonwebtoken 11.1.0",
- "more-di",
- "serde",
- "serde_json",
- "surrealdb",
- "thiserror",
- "tokio",
- "tower",
- "tracing",
- "tracing-subscriber",
- "utoipa",
- "utoipa-axum",
- "utoipa-swagger-ui",
- "uuid",
- "validator",
-]
-
-[[package]]
 name = "axum-core"
 version = "0.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1235,15 +1208,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cb4cb245038516f5f85277875cdaa4f7d2c9a0fa0468de06ed190163b1581fcf"
 dependencies = [
  "percent-encoding",
-]
-
-[[package]]
-name = "framework-macros"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.119",
 ]
 
 [[package]]
@@ -2678,6 +2642,67 @@ name = "openssl-probe"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7c87def4c32ab89d880effc9e097653c8da5d6ef28e6b539d313baaacfbafcbe"
+
+[[package]]
+name = "oxidax"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "axum",
+ "dotenvy",
+ "inventory",
+ "more-di",
+ "oxidax-core",
+ "serde",
+ "serde_json",
+ "surrealdb",
+ "thiserror",
+ "tokio",
+ "tower",
+ "tracing",
+ "tracing-subscriber",
+ "utoipa",
+ "utoipa-axum",
+ "uuid",
+ "validator",
+]
+
+[[package]]
+name = "oxidax-cli"
+version = "0.1.0"
+
+[[package]]
+name = "oxidax-core"
+version = "0.1.0"
+dependencies = [
+ "argon2",
+ "async-trait",
+ "axum",
+ "dotenvy",
+ "inventory",
+ "jsonwebtoken 11.1.0",
+ "more-di",
+ "oxidax-macro",
+ "serde",
+ "serde_json",
+ "surrealdb",
+ "thiserror",
+ "tracing",
+ "utoipa",
+ "utoipa-axum",
+ "utoipa-swagger-ui",
+ "uuid",
+ "validator",
+]
+
+[[package]]
+name = "oxidax-macro"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+]
 
 [[package]]
 name = "p256"

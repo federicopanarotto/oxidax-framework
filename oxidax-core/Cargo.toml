@@ -1,0 +1,26 @@
+[package]
+name = "oxidax-core"
+version = "0.1.0"
+edition = "2024"
+description = "Reusable core library of the Oxidax framework: config, errors, auth, middleware, pagination, DI registry and app assembly."
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+axum = "0.8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+utoipa = { version = "6", features = ["axum_extras", "uuid", "preserve_order"] }
+utoipa-axum = "0.3"
+utoipa-swagger-ui = { version = "10", features = ["axum"] }
+inventory = "0.3.25"
+surrealdb = { version = "3.3.1", features = ["kv-mem"] }
+uuid = { version = "1.23.0", features = ["v4", "serde"] }
+async-trait = "0.1"
+thiserror = "2"
+tracing = "0.1"
+more-di = { version = "3", features = ["async"] }
+validator = { version = "0.21", features = ["derive"] }
+dotenvy = "0.15"
+jsonwebtoken = { version = "11", features = ["rust_crypto"] }
+argon2 = "0.5"
+oxidax-macro = { path = "../oxidax-macro" }

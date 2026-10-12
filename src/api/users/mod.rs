@@ -8,15 +8,13 @@ pub mod user_service;
 use di::Injectable;
 use di::ServiceCollection;
 
-use crate::db;
-use crate::framework::{Feature, register_repository};
+use crate::framework::Feature;
 use user_service::UserService;
 
 // All the DI wiring lives here; every route is auto-registered by `#[route]`
 // on the handlers in `user_controller`. The identity repository is owned by
-// the auth library (registered with the JWT settings at order 0).
-fn register(repositories: &db::Repositories, services: &mut ServiceCollection) {
-    register_repository(services, repositories.users.clone());
+// the auth library and registered centrally in `crate::db`.
+fn register(services: &mut ServiceCollection) {
     services.add(UserService::singleton());
 }
 

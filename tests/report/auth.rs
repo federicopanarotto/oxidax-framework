@@ -233,14 +233,14 @@ async fn me_returns_profile_with_email() {
 async fn expired_access_token_is_rejected() {
     let (app, provider) = app_and_provider().await;
 
-    let jwt = provider.get_required::<axum_api::lib::auth::JwtConfig>();
-    let now = axum_api::lib::auth::JwtConfig::now();
+    let jwt = provider.get_required::<oxidax::lib::auth::JwtConfig>();
+    let now = oxidax::lib::auth::JwtConfig::now();
     let expired = jwt
-        .encode(&axum_api::lib::auth::jwt::Claims {
+        .encode(&oxidax::lib::auth::jwt::Claims {
             sub: "550e8400-e29b-41d4-a716-446655440000".to_string(),
             identity_id: "d6c1a1b2-1111-2222-3333-444455556666".to_string(),
             role: "user".to_string(),
-            token_use: axum_api::lib::auth::jwt::ACCESS.to_string(),
+            token_use: oxidax::lib::auth::jwt::ACCESS.to_string(),
             jti: "expired-test".to_string(),
             // Well past the 60s leeway jsonwebtoken applies by default.
             iat: now - 300,
@@ -332,9 +332,9 @@ async fn users_list_requires_admin_role() {
 
 #[tokio::test]
 async fn admin_can_list_users_with_emails() {
-    use axum_api::api::users::user_entity::{ROLE_ADMIN, User};
-    use axum_api::api::users::user_repository::UserRepository;
-    use axum_api::lib::auth::{AuthProvider, UserIdentity, UserIdentityRepository, password};
+    use oxidax::api::users::user_entity::{ROLE_ADMIN, User};
+    use oxidax::api::users::user_repository::UserRepository;
+    use oxidax::lib::auth::{AuthProvider, UserIdentity, UserIdentityRepository, password};
 
     let (app, provider) = app_and_provider().await;
 

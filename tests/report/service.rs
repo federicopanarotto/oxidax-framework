@@ -3,9 +3,9 @@
 
 use std::sync::Arc;
 
-use axum_api::api::reports::report_dto::CreateReportDto;
-use axum_api::api::reports::report_service::ReportService;
-use axum_api::errors::AppError;
+use oxidax::api::reports::report_dto::CreateReportDto;
+use oxidax::api::reports::report_service::ReportService;
+use oxidax::errors::AppError;
 
 async fn service() -> Arc<ReportService> {
     crate::support::report_service().await

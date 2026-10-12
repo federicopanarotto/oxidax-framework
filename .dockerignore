@@ -1,0 +1,14 @@
+# Excluded from the build context: only src + Cargo.* + the local crates are needed.
+.git
+.gitignore
+target
+.cargo
+.env
+docker
+.devcontainer
+.opencode
+tests
+e2e.sh
+*.tar
+README.md
+ADD-FEATURE.md

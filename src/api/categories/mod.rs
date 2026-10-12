@@ -8,14 +8,13 @@ pub mod surreal_category_repository;
 use di::Injectable;
 use di::ServiceCollection;
 
-use crate::db;
-use crate::framework::{Feature, register_repository};
+use crate::framework::Feature;
 use category_service::CategoryService;
 
 // All the DI wiring lives here; every route is auto-registered by `#[route]`
-// on the handlers in `category_controller`.
-fn register(repositories: &db::Repositories, services: &mut ServiceCollection) {
-    register_repository(services, repositories.categories.clone());
+// on the handlers in `category_controller`. The repository is registered
+// centrally in `crate::db`.
+fn register(services: &mut ServiceCollection) {
     services.add(CategoryService::singleton());
 }
 

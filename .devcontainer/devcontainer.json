@@ -1,13 +1,13 @@
 {
-  "name": "axum-api",
+  "name": "oxidax",
   "dockerComposeFile": "docker-compose.yml",
   "service": "app",
   "workspaceFolder": "/workspace",
   "shutdownAction": "stopCompose",
-  "forwardPorts": [3000, 8000],
+  "forwardPorts": [3000, 12129],
   "portsAttributes": {
-    "3000": { "label": "Axum API", "onAutoForward": "notify" },
-    "8000": { "label": "SurrealDB", "onAutoForward": "silent" }
+    "3000": { "label": "Oxidax API", "onAutoForward": "notify" },
+    "12129": { "label": "SurrealDB", "onAutoForward": "silent" }
   },
   "customizations": {
     "vscode": {

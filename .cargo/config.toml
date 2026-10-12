@@ -1,3 +1,16 @@
 [alias]
 dev = "watch --poll -x run"
 dev-check = "watch --poll -x check"
+
+# Workspace task runner and code generator: `cargo xtask <task>` expands to
+# `cargo run --quiet --package oxidax-cli -- <task>` (see oxidax-cli/).
+xtask = "run --quiet --package oxidax-cli --"
+new-feature = "run --quiet --package oxidax-cli -- new-feature"
+
+# Docker shortcuts: build the image, save the tar and start/stop the production
+# stack in docker/prod.
+docker-build = "run --quiet --package oxidax-cli -- docker-build"
+docker-save = "run --quiet --package oxidax-cli -- docker-save"
+docker-package = "run --quiet --package oxidax-cli -- docker-package"
+docker-run = "run --quiet --package oxidax-cli -- docker-run"
+docker-stop = "run --quiet --package oxidax-cli -- docker-stop"

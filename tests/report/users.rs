@@ -13,9 +13,9 @@ use crate::support::{access_token_for, app_and_provider, authorized_get, json_bo
 /// exactly like in production) and returns its access token through a real
 /// login.
 async fn admin_token(app: &Router, provider: &di::ServiceProvider) -> String {
-    use axum_api::api::users::user_entity::{ROLE_ADMIN, User};
-    use axum_api::api::users::user_repository::UserRepository;
-    use axum_api::lib::auth::{AuthProvider, UserIdentity, UserIdentityRepository, password};
+    use oxidax::api::users::user_entity::{ROLE_ADMIN, User};
+    use oxidax::api::users::user_repository::UserRepository;
+    use oxidax::lib::auth::{AuthProvider, UserIdentity, UserIdentityRepository, password};
 
     let admin_id = uuid::Uuid::new_v4().to_string();
     provider

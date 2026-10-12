@@ -1,7 +1,17 @@
 [package]
-name = "axum-api"
+name = "oxidax"
 version = "0.1.0"
 edition = "2024"
+description = "Oxidax application: reports, categories and places API built on the Oxidax framework."
+license = "MIT OR Apache-2.0"
+
+[workspace]
+# The root package (oxidax) is the application and is always a member; the
+# reusable crates live in their own directories. `default-members` keeps the
+# previous behaviour (cargo run/build/test only touch the application), while
+# `cargo clippy --workspace` checks every crate.
+members = ["oxidax-core", "oxidax-macro", "oxidax-cli"]
+default-members = ["."]
 
 [dependencies]
 axum = "0.8"
@@ -10,7 +20,6 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 utoipa = { version = "6", features = ["axum_extras", "uuid", "preserve_order"] }
 utoipa-axum = "0.3"
-utoipa-swagger-ui = { version = "10", features = ["axum"] }
 inventory = "0.3.25"
 surrealdb = { version = "3.3.1", features = ["kv-mem"] }
 uuid = { version = "1.23.0", features = ["v4", "serde"] }
@@ -21,9 +30,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 more-di = { version = "3", features = ["async"] }
 validator = { version = "0.21", features = ["derive"] }
 dotenvy = "0.15"
-jsonwebtoken = { version = "11", features = ["rust_crypto"] }
-argon2 = "0.5"
-framework-macros = { path = "framework-macros" }
+oxidax-core = { path = "oxidax-core" }
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }

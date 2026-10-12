@@ -7,8 +7,8 @@
 
 use tracing_subscriber::EnvFilter;
 
-use axum_api::api;
-use axum_api::config::Config;
+use oxidax::app;
+use oxidax::config::Config;
 
 /// Async runtime entry point (`#[tokio::main]` expands to a multi-threaded
 /// runtime and drives the future returned by this `async fn` to completion).
@@ -27,7 +27,7 @@ async fn main() {
     tracing_subscriber::fmt()
         .with_env_filter(
             EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| EnvFilter::new("info,axum_api=debug")),
+                .unwrap_or_else(|_| EnvFilter::new("info,oxidax=debug,oxidax_core=debug")),
         )
         .init();
 
@@ -42,7 +42,7 @@ async fn main() {
     // merges them with the OpenAPI spec/Swagger UI and installs the fallback
     // handler. Everything is discovered automatically: this call does not need
     // to change when a new feature is added.
-    let app = api::router::build(&config)
+    let app = app::build(&config)
         .await
         .expect("failed to start the application");
 

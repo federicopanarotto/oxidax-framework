@@ -1,96 +1,118 @@
-# axum-api — un framework personale per API in Rust
+# Oxidax — a personal framework for building APIs in Rust
 
-> **Progetto sperimentale.** Questo repository è un "campo di prova" dove sto
-> costruendo, pezzo per pezzo, un **mio** framework personale per scrivere API
-> in Rust. L'obiettivo non è inventare tutto da zero, ma portare in Rust lo
-> stile di sviluppo che mi trovavo bene con **Express / Node**, approfittando
-> della velocità e della sicurezza di Rust e di un database performante come
+> **Experimental project.** This repository is a "proving ground" where I build,
+> piece by piece, **my own** personal framework for writing APIs in Rust. The
+> goal is not to invent everything from scratch, but to bring to Rust the
+> development style I was comfortable with in **Express / Node**, taking
+> advantage of Rust's speed and safety and of a performant database like
 > **SurrealDB**.
 
-## Filosofia
+## Philosophy
 
-1. **Riusare le librerie esistenti.** In Rust esistono già ecosistemi maturi per
-   praticamente ogni tassello di un'API: routing, gestione errori, validazione,
-   documentazione OpenAPI, dependency injection. Il framework sceglie le
-   migliori e le *combina* in una convenzione di progetto comoda, invece di
-   riscriverle.
-2. **Zero-touch.** Aggiungere una feature (= un dominio dell'API) significa
-   solo creare i suoi moduli. I file di "cablaggio" (`features.rs`, `router.rs`,
-   `docs.rs`) sono generici e **non si toccano mai**.
-3. **Stile decorator.** Gli handler si dichiarano come funzioni con attributi:
-   la rotta e la documentazione si scrivono "sulla" funzione (`#[route]` +
-   `#[utoipa::path]`), i DTO si validano con decoratori (`#[validate]` dentro
-   `ValidatedJson<...>`), esattamente come con i decoratori a cui ero abituato.
+1. **Reuse existing libraries.** Rust already has mature ecosystems for
+   practically every building block of an API: routing, error handling,
+   validation, OpenAPI documentation, dependency injection. The framework
+   chooses the best ones and *combines* them into a convenient project
+   convention instead of rewriting them.
+2. **Zero-touch.** Adding a feature (= a domain of the API) means only creating
+   its modules. The "wiring" is generic and **never needs to be touched**.
+3. **Decorator style.** Handlers are declared as functions with attributes: the
+   route and its documentation are written "on" the function (`#[route]` +
+   `#[utoipa::path]`), DTOs are validated with decorators (`#[validate]` inside
+   `ValidatedJson<...>`), just like the decorators I was used to.
+
+## Workspace layout
+
+The project is a Cargo workspace split into reusable crates plus the
+application:
+
+| Crate         | Role                                                                        |
+| ------------- | --------------------------------------------------------------------------- |
+| `oxidax-core` | Reusable library: config, errors, auth, middleware, pagination, DI/route registries, DB helpers and generic app assembly |
+| `oxidax-macro`| The `#[route]` procedural macro                                              |
+| `oxidax-cli`  | Command-line tools: Docker helpers and the `new-feature` code generator (`cargo xtask ...`) |
+| `oxidax` (root) | The application: the feature modules and the thin composition (which database backend, OpenAPI metadata) |
+
+Everything that is identical across projects lives in `oxidax-core`; the
+application's `src/` only contains the application code.
 
 ## Stack
 
-| Tassello      | Crate scelto                                       | Perché                                                       |
-| ------------- | -------------------------------------------------- | ------------------------------------------------------------ |
-| HTTP/rotta    | [axum](https://github.com/tokio-rs/axum)           | performante, macro-free, ecosistema tower                    |
-| OpenAPI/UI    | [utoipa](https://github.com/juhaku/utoipa) + `utoipa-axum` + `utoipa-swagger-ui` | decoratori `#[utoipa::path]`, Swagger UI pronta               |
-| Rotta self-registrata | `framework-macros` (mia proc-macro `#[route]`) + [inventory](https://github.com/dtolnay/inventory) | discovery statica delle rotte a compile-time                  |
-| Validazione   | [validator](https://github.com/Keats/validator)    | decoratori di validazione già maturi                          |
-| DI            | [more-di](https://github.com/AndyShi-more/MoreDi)  | iniezione lazy + `ServiceProvider`                            |
-| DB            | [SurrealDB](https://surrealdb.com) + `surrealdb`   | database performante, `mem://` per i test, schema-less        |
-| Auth          | `jsonwebtoken` + `argon2`                           | JWT HS256 (access/refresh) + hash password Argon2id           |
-| Errori        | `thiserror` + pipeline unificata                   | contratto di errore uniforme in tutta l'API                   |
+| Building block | Chosen crate                                       | Why                                                          |
+| -------------- | -------------------------------------------------- | ------------------------------------------------------------ |
+| HTTP/route     | [axum](https://github.com/tokio-rs/axum)           | performant, macro-free, tower ecosystem                      |
+| OpenAPI/UI     | [utoipa](https://github.com/juhaku/utoipa) + `utoipa-axum` + `utoipa-swagger-ui` | `#[utoipa::path]` decorators, ready-made Swagger UI |
+| Self-registered route | `oxidax-macro` (my `#[route]` proc-macro) + [inventory](https://github.com/dtolnay/inventory) | compile-time static route discovery      |
+| Validation     | [validator](https://github.com/Keats/validator)    | mature validation decorators                                 |
+| DI             | [more-di](https://github.com/AndyShi-more/MoreDi)  | lazy injection + `ServiceProvider`                           |
+| Database       | [SurrealDB](https://surrealdb.com) + `surrealdb`   | performant database, `mem://` for tests, schema-less         |
+| Auth           | `jsonwebtoken` + `argon2`                          | HS256 JWT (access/refresh) + Argon2id password hashing       |
+| Errors         | `thiserror` + unified pipeline                     | uniform error contract across the whole API                  |
 
-## Struttura del progetto
+## Project structure
 
 ```
-src/
-├── api/                      # le feature dell'API
-│   ├── features.rs           # generico: registra le feature nel container DI
-│   ├── router.rs             # generico: assembla il router finale + Swagger UI
-│   ├── docs.rs               # generico: merge degli spec OpenAPI delle feature
-│   └── categories/           # feature "categories"
-│       ├── mod.rs            # wiring DI (repository + service) + registrazione
-│       ├── category_dto.rs   # DTO presenti in body/query/params
-│       ├── category_entity.rs# modello di persistenza
-│       ├── category_repository.rs   # trait del repository
-│       ├── surreal_category_repository.rs  # implementazione per SurrealDB
-│       ├── category_service.rs       # logica di dominio
-│       └── category_controller.rs    # gli handler HTTP con #[route]
-│   ├── places/               # feature "places" (city, address, cap, provenance)
-│   ├── reports/              # feature "reports" (dipende da categories, places e users)
-│   ├── users/                # feature "users" (/api/users/me, lista admin)
-│   └── auth/                 # feature "auth" (register/login/refresh/logout)
-├── lib/                      # il "core" del framework
-│   ├── registry.rs           # registri statici Feature (DI) e Route
-│   ├── validators.rs         # estrattori ValidatedJson/Query/Params
-│   ├── pagination.rs         # PaginationQuery + Pagination + Paged<T> (X-TOTAL-LIST)
-│   ├── auth/                 # auth core: JWT, password, identità, guard/extractor
-│   └── middlewares/          # middleware estraibili, stile Express
-├── errors/                   # contratto errori + pipeline HTTP
-├── framework.rs              # facade: import unico (`crate::framework::*`) per le feature
-├── config.rs                 # configurazione da env
-└── db/                       # connessione SurrealDB + aggregatore repository
-    ├── mod.rs                # connessione + aggregatore repository
-    └── query.rs              # helper riusabili: count e select_page paginati
-framework-macros/             # la proc-macro #[route]
-tests/report/                 # integration test end-to-end (HTTP reali)
+oxidax-core/                  # reusable framework library
+├── src/
+│   ├── app.rs                # generic assembly: DI provider + router + Swagger UI
+│   ├── docs.rs              # OpenAPI base document (security schemes)
+│   ├── config.rs            # configuration from the environment
+│   ├── errors/              # error contract + HTTP pipeline
+│   ├── auth/                # JWT, password hashing, identity, guard/extractor
+│   ├── middlewares/         # extractable middleware, Express style
+│   ├── pagination.rs        # PaginationQuery + Pagination + Paged<T> (X-TOTAL-LIST)
+│   ├── validators.rs        # shared validators
+│   ├── registry.rs          # static Feature (DI) and Route registries
+│   ├── db/                  # SurrealDB connection + reusable query helpers
+│   └── framework.rs         # facade: single import (`oxidax_core::framework::*`)
+
+oxidax-macro/src/lib.rs      # the #[route] proc-macro
+oxidax-cli/src/              # `cargo xtask`: Docker helpers + `new-feature` generator
+
+src/                         # the application
+├── api/                     # the API features
+│   ├── categories/          # "categories" feature
+│   │   ├── mod.rs           # DI wiring (service) + registration
+│   │   ├── category_dto.rs  # DTOs used in body/query/params
+│   │   ├── category_entity.rs       # persistence model
+│   │   ├── category_repository.rs   # repository trait
+│   │   ├── surreal_category_repository.rs  # SurrealDB implementation
+│   │   ├── category_service.rs      # domain logic
+│   │   └── category_controller.rs   # HTTP handlers with #[route]
+│   ├── places/              # "places" feature (city, address, cap, provenance)
+│   ├── reports/             # "reports" feature (depends on categories, places and users)
+│   ├── users/               # "users" feature (/api/users/me, admin list)
+│   └── auth/                # "auth" feature (register/login/refresh/logout)
+├── db.rs                    # concrete repositories + central DI registration
+├── app.rs                   # application assembly entry point
+├── lib.rs                   # re-exports of the core (keeps `crate::lib::...` paths)
+└── main.rs                  # binary entry point
+
+tests/report/                # end-to-end integration tests (real HTTP)
+docker/prod/                 # production image + compose stack
 ```
 
-### Come nasce una feature
+## How a feature is born
 
-Una nuova feature è *solo* il suo modulo. Presa "categories":
+A new feature is *only* its module. Taking "categories":
 
-1. **`mod.rs`** — il wiring DI (l'unica riga "manuale" di tutto il framework):
+1. **`mod.rs`** — the DI wiring (the only "manual" line): it registers the
+   service. Concrete repositories are registered centrally (see `src/db.rs`),
+   so the feature stays database-agnostic:
    ```rust
-   fn register(repositories: &db::Repositories, services: &mut ServiceCollection) {
-       register_repository(services, repositories.categories.clone());
+   fn register(services: &mut ServiceCollection) {
        services.add(CategoryService::singleton());
    }
 
    inventory::submit! { Feature::new(0, register) }
    ```
-   L'`order` serve a garantire l'ordine di registrazione quando una feature
-   dipende da un'altra (reports → categories).
+   The optional `order` guarantees the registration order when a feature depends
+   on another (reports → categories).
 
-2. **`category_controller.rs`** — gli handler: niente oggetto controller, solo
-   funzioni con due attributi:
+2. **`category_controller.rs`** — the handlers: no controller object, just
+   functions with two attributes:
    ```rust
-   #[route]                                    // auto-registra rotta + OpenAPI
+   #[route]                                    // auto-registers route + OpenAPI
    #[utoipa::path(post, path = "/api/categories",
        request_body = CreateCategoryDto,
        responses((status = 201, body = CategoryResponse), ...))]
@@ -103,63 +125,80 @@ Una nuova feature è *solo* il suo modulo. Presa "categories":
    }
    ```
 
-3. **`category_dto.rs`** — i DTO con i decoratori di validazione:
+3. **`category_dto.rs`** — the DTOs with validation decorators:
    ```rust
    #[derive(Debug, Serialize, Deserialize, ToSchema)]
    #[serde(deny_unknown_fields)]
    pub struct CreateCategoryDto {
-       #[validate(length(min = 3, max = 64, message = "Il nome è obbligatorio e deve avere almeno 3 caratteri"))]
+       #[validate(length(min = 3, max = 64, message = "The name is required and must be at least 3 characters"))]
        #[schema(max_length = 64)]
        pub name: String,
    }
    ```
 
-Nessuna altra modifica: `features.rs`, `router.rs`, `docs.rs` iterano i
-registri statici e raccolgono automaticamente rotte e specifica OpenAPI.
+No other change: the assembly in `oxidax-core::app` iterates the static
+registries and automatically collects routes and the OpenAPI spec.
 
-### Proteggere un handler
+## Code generator (CLI)
 
-Un handler autenticato (o riservato a dei ruoli) aggiunge un attributo,
-consumato da `#[route]`:
+`cargo xtask new-feature` scaffolds a complete, compiling CRUD feature
+interactively: it asks for the feature name and its fields (name + type from a
+menu) and writes the entity, DTOs, repository trait, SurrealDB repository,
+service, controller, the DI registration, the `src/db.rs` wiring and a full CRUD
+test. Complex logic (relations, custom validation, extra endpoints) is left to
+be added afterwards — opencode understands the generated code and the CLI
+scripts, so it can evolve them.
+
+```bash
+cargo new-feature        # or: cargo xtask new-feature
+```
+
+Docker shortcuts (see `docker/prod`): `cargo docker-build`, `cargo docker-save`,
+`cargo docker-package`, `cargo docker-run`, `cargo docker-stop`.
+
+## Protecting a handler
+
+An authenticated handler (or one restricted to some roles) adds one attribute,
+consumed by `#[route]`:
 
 ```rust
-#[route]                                  // solo utenti autenticati
+#[route]                                  // authenticated users only
 #[utoipa::path(get, path = "/api/users/me", ...)]
 #[IsGranted]
 pub async fn get_me(service: ..., current: CurrentUser) -> ... { ... }
 
-#[route]                                  // solo ruoli ammessi
+#[route]                                  // only the allowed roles
 #[IsGranted(["admin"])]
 pub async fn list_users(...) -> ... { ... }
 ```
 
-La macro genera il layer con la guardia (`401` senza token valido, `403` col
-ruolo sbagliato) e l'estrattore `CurrentUser` espone `user_id`, `identity_id`
-e `role`: anche l'auth resta zero-touch, senza layer globali da configurare.
+The macro generates the guard layer (`401` without a valid token, `403` with the
+wrong role) and the `CurrentUser` extractor exposes `user_id`, `identity_id` and
+`role`: auth is zero-touch too, with no global layer to configure.
 
-## Contratto delle risposte
+## Response contract
 
-- **Successo**: corpo JSON del DTO di risposta (o `204`).
-- **Errore**: sempre `{code, error, message}` con status HTTP significativo
-  (`not_found`, `database_unavailable`, ...). Vale per dominio, pipeline e
-  validazione DTO: per quest'ultima `code` è `validation_error` (campo non
-  valido, `422`) oppure `bad_request` (body/query/params malformati, `400`);
-  i problemi campo per campo sono elencati in `message`, formato "Gentile e
-  professionale" pensato anche per l'utente finale.
+- **Success**: JSON body of the response DTO (or `204`).
+- **Error**: always `{code, error, message}` with a meaningful HTTP status
+  (`not_found`, `database_unavailable`, ...). This holds for domain errors, the
+  pipeline and DTO validation: for the latter `code` is `validation_error`
+  (invalid field, `422`) or `bad_request` (malformed body/query/params, `400`);
+  the field-by-field problems are listed in `message`, in a "kind and
+  professional" format meant to be readable by the end user too.
 
-## Paginazione
+## Pagination
 
-Le liste (`/api/categories`, `/api/places`, `/api/reports`, `/api/users`) sono
-paginabili con due query param **opzionali** e validati:
+The lists (`/api/categories`, `/api/places`, `/api/reports`, `/api/users`) are
+paginated with two **optional**, validated query params:
 
-| Parametro | Default | Vincoli      |
-| --------- | ------- | ------------ |
-| `page`    | `1`     | `>= 1`       |
-| `limit`   | `20`    | tra `1` e `100` |
+| Param   | Default | Constraints      |
+| ------- | ------- | ---------------- |
+| `page`  | `1`     | `>= 1`           |
+| `limit` | `20`    | between `1` and `100` |
 
-Il **corpo della risposta resta l'array JSON** di sempre, senza envelope. Il
-numero totale di elementi (su tutte le pagine) viaggia nell'header
-**`X-TOTAL-LIST`**, così il client può calcolare il numero di pagine:
+The **response body stays the usual JSON array**, with no envelope. The total
+number of items (across every page) travels in the **`X-TOTAL-LIST`** header, so
+the client can compute the number of pages:
 
 ```http
 GET /api/categories?page=2&limit=5
@@ -167,146 +206,148 @@ X-TOTAL-LIST: 42
 ```
 
 ```json
-[ { "id": "...", "name": "Vendita" }, ... ]
+[ { "id": "...", "name": "Sale" }, ... ]
 ```
 
-I valori fuori range danno `422 {code: validation_error}` (come ogni DTO
-validato); un valore non numerico dà `400 {code: bad_request}`. Tutto è
-riutilizzabile: il DTO
-`PaginationQuery`, il value object `Pagination` e il payload `Paged<T>` vivono
-in `src/lib/pagination.rs` e gli helper di query (count + pagina) in
-`src/db/query.rs`. Una feature paginata aggiunge solo un estrattore e fa
-ritornare `Paged<T>` dal service; il controller chiama `page.into_response()`
-per comporre corpo + header.
+Out-of-range values give `422 {code: validation_error}` (like every validated
+DTO); a non-numeric value gives `400 {code: bad_request}`. Everything is
+reusable: the `PaginationQuery` DTO, the `Pagination` value object and the
+`Paged<T>` payload live in `oxidax-core/src/pagination.rs`, and the query
+helpers (count + page) in `oxidax-core/src/db/query.rs`. A paginated feature only
+adds an extractor and returns `Paged<T>` from the service; the controller calls
+`page.into_response()` to compose the body + header.
 
-## Autenticazione
+## Authentication
 
-JWT firmati in HS256 (`JWT_SECRET`) con due token distinti: un access token
-breve e un refresh token lungo e **monouso** (rotato a ogni refresh, bruciato
-dal logout).
+JWTs signed with HS256 (`JWT_SECRET`) with two distinct tokens: a short-lived
+access token and a long, **single-use** refresh token (rotated on every refresh,
+burned by logout).
 
-| Endpoint                 | Effetto                                                             |
-| ------------------------ | ------------------------------------------------------------------- |
-| `POST /api/auth/register` | `201 {message}`: nessun token; l'email è l'username (`role = user`) |
-| `POST /api/auth/login`   | `200 {access_token, refresh_token, token_type, expires_in}`         |
-| `POST /api/auth/refresh` | nuovo pair; il vecchio refresh token smette di funzionare           |
-| `POST /api/auth/logout`  | `204`: azzera il `jti` → il refresh token outstandig è revocato     |
-| `GET /api/users/me`      | profilo del chiamante con email                                      |
-| `GET /api/users`         | lista utenti con email, solo `admin`; filtro opzionale `?role=admin\|user`, paginata (`?page=`, `?limit=`) |
+| Endpoint                  | Effect                                                              |
+| ------------------------- | ------------------------------------------------------------------- |
+| `POST /api/auth/register` | `201 {message}`: no token; the email is the username (`role = user`) |
+| `POST /api/auth/login`    | `200 {access_token, refresh_token, token_type, expires_in}`          |
+| `POST /api/auth/refresh`  | new pair; the old refresh token stops working                        |
+| `POST /api/auth/logout`   | `204`: clears the `jti` → the outstanding refresh token is revoked   |
+| `GET /api/users/me`       | the caller's profile with email                                      |
+| `GET /api/users`          | user list with email, `admin` only; optional `?role=admin\|user` filter, paginated (`?page=`, `?limit=`) |
 
-Errori **generici** per design: email ignota e password sbagliata danno lo
-stesso `401 invalid credentials`, il doppio register dà `409` generico (niente
-enumerazione account). Il primo admin si assegna direttamente sul database.
-In Swagger i due scheme `accessToken`/`refreshToken` (bearer JWT) sono pronti
-da usare con "Authorize".
+Errors are **generic** by design: an unknown email and a wrong password give the
+same `401 invalid credentials`, a duplicate register gives a generic `409` (no
+account enumeration). The first admin is assigned directly in the database. In
+Swagger the two schemes `accessToken`/`refreshToken` (bearer JWT) are ready to
+use with "Authorize".
 
-## Documentazione
+## Documentation
 
-La UI Swagger è servita, live, a **`/swagger-ui`** (spec completa a
-`/api-docs/openapi.json`). Niente file di export: è il framework che compone lo
-spec OpenAPI a partire dalle macro mentre monta le rotte.
+The Swagger UI is served, live, at **`/swagger-ui`** (full spec at
+`/api-docs/openapi.json`). No export file: the framework composes the OpenAPI
+spec from the macros while it mounts the routes.
 
-## Configurazione
+## Configuration
 
-La configurazione arriva **solo** da variabili d'ambiente: nessun valore è
-hardcoded nel codice. In locale i valori sono letti dal file `.env`
-(git-ignorato) tramite `dotenvy`; le variabili già presenti nell'ambiente hanno
-precedenza su quelle del file.
+Configuration comes **only** from environment variables: no value is hardcoded.
+Locally the values are read from the `.env` file (git-ignored) via `dotenvy`;
+variables already present in the environment take precedence over the file.
 
 ```bash
-cp .env.example .env   # template con tutte le variabili richieste
+cp .env.example .env   # template with all required variables
 ```
 
-Variabili richieste: `SERVER_ADDR`, `DB_BACKEND` (`surreal` o `memory`),
+Required variables: `SERVER_ADDR`, `DB_BACKEND` (`surreal` or `memory`),
 `SURREAL_URL`, `SURREAL_NS`, `SURREAL_DB`, `SURREAL_USER`, `SURREAL_PASS`,
-`JWT_SECRET`, `ACCESS_TOKEN_DURATION` (secondi), `REFRESH_TOKEN_DURATION`
-(secondi). Se una variabile manca l'avvio fallisce con un messaggio esplicito.
+`JWT_SECRET`, `ACCESS_TOKEN_DURATION` (seconds), `REFRESH_TOKEN_DURATION`
+(seconds). If a variable is missing, startup fails with an explicit message.
 
-## Avvio
+## Running
 
 ```bash
-# Dev container (SurrealDB + toolchain inclusi)
+# Dev container (SurrealDB + toolchain included)
 docker compose -f .devcontainer/docker-compose.yml up -d
 
-# Backend in-memory, senza SurrealDB esterno
+# In-memory backend, no external SurrealDB
 DB_BACKEND=memory cargo run
 
-# Backend su SurrealDB (valori dal .env)
+# SurrealDB backend (values from .env)
 cargo run
 ```
 
-### Auto-reload in sviluppo (equivalente di nodemon)
+### Auto-reload in development (the nodemon equivalent)
 
-`cargo-watch` è l'equivalente Rust di `nodemon`: ricompila e riavvia il processo
-a ogni salvataggio. È già installato nell'immagine del dev container e ci sono
-due alias pronti in `.cargo/config.toml`:
+`cargo-watch` is the Rust equivalent of `nodemon`: it recompiles and restarts
+the process on every save. It is already installed in the dev container image
+and two aliases are ready in `.cargo/config.toml`:
 
 ```bash
-cargo dev          # = cargo watch --poll -x run   (ricompila e riavvia il server)
-cargo dev-check    # = cargo watch --poll -x check (solo controllo, niente restart)
+cargo dev          # = cargo watch --poll -x run   (recompile and restart the server)
+cargo dev-check    # = cargo watch --poll -x check (check only, no restart)
 ```
 
-oppure l'invocazione esplicita:
+or the explicit invocation:
 
 ```bash
-cargo watch --poll -x run                 # con il .env (SurrealDB)
+cargo watch --poll -x run                 # with the .env (SurrealDB)
 DB_BACKEND=memory cargo watch --poll -x run
 ```
 
-`cargo watch` osserva `src/`, `framework-macros/`, i test, `Cargo.toml` e il
-resto del progetto, ignorando `target/`.
+`cargo watch` observes `src/`, the workspace crates, the tests, `Cargo.toml` and
+the rest of the project, ignoring `target/`.
 
-> **Perché `--poll`?** Con il mount `..:/workspace:cached` del dev container gli
-> eventi **inotify** generati dalle modifiche fatte *dall'host* (VS Code su
-> Windows) non arrivano al watcher dentro il container: senza `--poll` il
-> processo vedrebbe solo la modifica iniziale e mai i salvataggi successivi.
-> `--poll` fa controllare i file ogni 500 ms e funziona sempre. È un velo più
-> "pesante" (I/O) ma trascurabile per un progetto di questa dimensione.
+> **Why `--poll`?** With the dev container's `..:/workspace:cached` mount the
+> **inotify** events generated by edits made *from the host* (VS Code on
+> Windows) do not reach the watcher inside the container: without `--poll` the
+> process would only see the initial modification and never the following saves.
+> `--poll` makes it check the files every 500 ms and always works. It is a bit
+> "heavier" (I/O) but negligible for a project of this size.
 
-## Test
+## Tests
 
 ```bash
-cargo test          # integration test end-to-end su HTTP reali (40 test)
-cargo clippy --all-targets -- -D warnings
-cargo fmt --check
+cargo test                                  # end-to-end integration tests over real HTTP (40 tests)
+cargo clippy --workspace --all-targets -- -D warnings
+cargo fmt --all --check
 ```
 
-## Stato
+## Status
 
-- [x] Routing + DI + OpenAPI con discovery **zero-touch** (`#[route]` su ogni
-      handler, registri `inventory`)
-- [x] Validazione decorator su body/query/params con errori `422 {code: validation_error}`
-- [x] Pipeline errori uniforme + fallback 404
-- [x] Errori **tutti** nello stesso formato `{code, error, message}`: dominio,
-      pipeline e validazione DTO condividono il body (`ErrorResponse`,
-      `bad_request` per body/query/params malformati)
-- [x] Feature di esempio: `categories`, `reports` e `places` su SurrealDB
-      (`mem://` nei test)
-- [x] Swagger UI live
-- [x] Access log (middleware esterno) + autenticazione JWT con guard
-      **per-rotta** (`#[IsGranted]`, ruoli inclusi)
-- [x] Report con creatore: `POST /api/reports` autenticato, l'utente del token
-      viene salvato e restituito come `created_by` nelle letture; anche
-      `PUT`/`DELETE` sono autenticati, le letture restano pubbliche
-- [x] Query param validati: `GET /api/users?role=admin|user` (`UserListQueryDto`
-      con `ValidatedQuery`, `422` sui valori fuori elenco)
-- [x] Paginazione riutilizzabile su tutte le liste: `?page=&limit=` validati,
-      array nel body e totale in `X-TOTAL-LIST` (`Paged<T>` +
-      `src/db/query.rs`); `422` fuori range
-### Backlog (da sviluppare)
+- [x] Routing + DI + OpenAPI with **zero-touch** discovery (`#[route]` on every
+      handler, `inventory` registries)
+- [x] Decorator validation on body/query/params with `422 {code: validation_error}`
+- [x] Uniform error pipeline + 404 fallback
+- [x] **All** errors in the same `{code, error, message}` format: domain, pipeline
+      and DTO validation share the body (`ErrorResponse`, `bad_request` for
+      malformed body/query/params)
+- [x] Example features: `categories`, `reports` and `places` on SurrealDB
+      (`mem://` in tests)
+- [x] Live Swagger UI
+- [x] Access log (outer middleware) + JWT auth with **per-route** guard
+      (`#[IsGranted]`, roles included)
+- [x] Report with creator: `POST /api/reports` authenticated, the token's user is
+      stored and returned as `created_by` on reads; `PUT`/`DELETE` are
+      authenticated too, reads stay public
+- [x] Validated query params: `GET /api/users?role=admin|user` (`UserListQueryDto`
+      with `ValidatedQuery`, `422` on out-of-list values)
+- [x] Reusable pagination on every list: validated `?page=&limit=`, array in the
+      body and total in `X-TOTAL-LIST` (`Paged<T>` + `oxidax-core/src/db/query.rs`);
+      `422` out of range
+- [x] Workspace split into `oxidax-core` (reusable library), `oxidax-macro`
+      (the `#[route]` macro) and `oxidax-cli` (Docker helpers + code generator)
+- [x] Interactive feature generator: `cargo xtask new-feature`
 
-Feature non ancora implementate, in ordine di priorità approssimativo. Le prime
-sono "di base" per rendere il framework completo; l'ordinamento è **non
-essenziale** al momento:
+### Backlog (to be developed)
 
-- [ ] Request ID + tracing per richiesta (correlation id nei log/header)
-- [ ] Migrazioni/schema versioning + indici per i campi filtrati
-- [ ] Rate limiting, CORS e security headers come middleware estraibili
-- [ ] Health con readiness (ping DB) + metriche + graceful shutdown
-- [ ] Timestamps `created_at`/`updated_at` e soft delete riusabili
-- [ ] `?sort=` (ordinamento) — **non essenziale**: prefisso `-` per desc o
-      param separato `order=asc|desc`, con whitelist campi per entità
-- [ ] Ricerca/filtri generici condivisi tra le feature
+Features not implemented yet, in approximate priority order. The first ones are
+"foundational" to make the framework complete; sorting is **not essential** at
+the moment:
 
-> **Nota**: il framework è in costruzione e serve a imparare: l'API pubblica
-> delle macro e la struttura dei registri possono cambiare.
+- [ ] Request ID + per-request tracing (correlation id in logs/headers)
+- [ ] Migrations/schema versioning + indexes for filtered fields
+- [ ] Rate limiting, CORS and security headers as extractable middleware
+- [ ] Health with readiness (DB ping) + metrics + graceful shutdown
+- [ ] Reusable `created_at`/`updated_at` timestamps and soft delete
+- [ ] `?sort=` (ordering) — **not essential**: `-` prefix for desc or a separate
+      `order=asc|desc` param, with a per-entity field whitelist
+- [ ] Generic search/filters shared across features
+
+> **Note**: the framework is under construction and is meant for learning: the
+> public macro API and the registries' structure may change.

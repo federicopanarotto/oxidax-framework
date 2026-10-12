@@ -1,84 +1,92 @@
-# Aggiungere una feature — guida passo-passo (esempio: `Places`)
+# Adding a feature — step-by-step guide (example: `Places`)
 
-Questa guida spiega, componente per componente, come si aggiunge una nuova
-feature all'API. Come esempio concreto costruiamo la feature **`Places`**
-(un luogo: `city`, `address`, `cap`, `provenance`) e la colleghiamo alla feature
-esistente **`reports`** con una relazione opzionale (un report può puntare a un
-place), esattamente come già avviene con `categories`.
+This guide explains, component by component, how to add a new feature to the
+API. As a concrete example we build the **`Places`** feature (a place: `city`,
+`address`, `cap`, `provenance`) and connect it to the existing **`reports`**
+feature with an optional relation (a report may point to a place), exactly as is
+already done with `categories`.
 
-> Convenzione del progetto: la prosa dei documenti è in italiano, ma **i
-> commenti nel codice e i messaggi di errore/log sono in inglese**.
+> **Fast path:** most of what this guide describes is generated for you by
+> `cargo xtask new-feature` (or the alias `cargo new-feature`): it scaffolds a
+> complete, compiling CRUD feature (entity, DTOs, repository, SurrealDB
+> implementation, service, controller, wiring and a test) from the feature name
+> and its fields. Read this guide to understand what it produces and to evolve
+> it by hand (relations, custom validation, extra endpoints).
+
+> Project convention: prose and code comments are in English.
 
 ---
 
-## 0. Modello mentale: i layer di una feature
+## 0. Mental model: the layers of a feature
 
-Una feature è composta sempre dagli stessi pezzi, impilati dal basso verso
-l'alto. Ogni layer dipende **solo** da quello sotto (mai il contrario):
+A feature is always made of the same pieces, stacked from the bottom up. Every
+layer depends **only** on the one below it (never the other way around):
 
 ```
                  HTTP (axum)
-   place_controller.rs   ← handler #[route] + #[utoipa::path]; parla SOLO col service
+   place_controller.rs   ← #[route] + #[utoipa::path] handlers; talks ONLY to the service
             │
-   place_service.rs      ← logica di dominio; parla col repository (e con altri service)
+   place_service.rs      ← domain logic; talks to the repository (and to other services)
             │
-   place_repository.rs   ← trait: il contratto di persistenza (DB-agnostico)
+   place_repository.rs   ← trait: the persistence contract (DB-agnostic)
             │
-   surreal_place_repository.rs ← implementazione per SurrealDB (l'unico punto DB-specific)
+   surreal_place_repository.rs ← SurrealDB implementation (the only DB-specific part)
             │
-   place_entity.rs       ← il modello puro che il repository persiste/restituisce
+   place_entity.rs       ← the pure model the repository persists/returns
             │
-   place_dto.rs          ← i DTO di ingresso/uscita (validazione, serializzazione JSON)
+   place_dto.rs          ← the input/output DTOs (validation, JSON serialization)
 ```
 
-Regole d'oro:
+Golden rules:
 
-- Il **controller** non contiene logica: chiama **una** funzione del service.
-- Il **service** è l'unico a orchestrare; se gli servono altri dati, ne parla con
-  altri service iniettati via DI (come `ReportService` fa con `CategoryService`).
-- Il **repository** è l'unico punto che "conosce" il database.
+- The **controller** holds no logic: it calls **one** service function.
+- The **service** is the only orchestrator; if it needs other data, it talks to
+  other services injected via DI (as `ReportService` does with `CategoryService`).
+- The **repository** is the only place that "knows" the database.
 
-### Cosa è automatico e cosa è manuale
+### What is automatic and what is manual
 
-Grazie al framework (macro `#[route]` + `inventory`) **non tocchi mai**
-`features.rs`, `router.rs`, `docs.rs`. Le uniche cose **manuali** quando aggiungi
-una feature sono:
+Thanks to the framework (the `#[route]` macro + `inventory`) the generic
+assembly lives in `oxidax-core` (`oxidax_core::app::assemble`) and **you never
+touch it**: it iterates the static registries and collects routes and the
+OpenAPI spec. The only **manual** things when adding a feature are:
 
-1. creare i file della feature;
-2. dichiarare il modulo in `src/api/mod.rs` (una riga);
-3. registrare il repository in `src/db/mod.rs` (l'aggregatore dei repository: è
-   l'unico punto che conosce i repository concreti).
+1. create the feature files;
+2. declare the module in `src/api/mod.rs` (one line);
+3. register the repository in `src/db.rs` (the repository aggregate: the single
+   place that knows the concrete repositories).
 
-Nella feature, la riga `inventory::submit!` in `mod.rs` auto-registra il wiring
-DI; i `#[route]` sugli handler auto-registrano rotte e OpenAPI.
+Inside the feature, the `inventory::submit!` line in `mod.rs` self-registers the
+DI wiring; the `#[route]` attributes on the handlers self-register routes and
+OpenAPI. (All of this is produced by `cargo xtask new-feature`.)
 
 ---
 
-## 1. Struttura dei file da creare
+## 1. Files to create
 
-Crea la cartella `src/api/places/` con questi file:
+Create the folder `src/api/places/` with these files:
 
 ```
 src/api/places/
-├── mod.rs                        # wiring DI + inventory::submit!  (auto-registrazione)
-├── place_entity.rs               # entità di dominio/persistenza
-├── place_dto.rs                  # DTO di ingresso (validate) e di uscita (response)
-├── place_repository.rs           # trait del repository
-├── surreal_place_repository.rs   # implementazione SurrealDB del trait
-├── place_service.rs              # logica di dominio
-└── place_controller.rs           # handler HTTP con #[route] + #[utoipa::path]
+├── mod.rs                        # DI wiring + inventory::submit!  (self-registration)
+├── place_entity.rs               # domain/persistence entity
+├── place_dto.rs                  # input DTOs (validate) and output DTOs (response)
+├── place_repository.rs           # repository trait
+├── surreal_place_repository.rs   # SurrealDB implementation of the trait
+├── place_service.rs              # domain logic
+└── place_controller.rs           # HTTP handlers with #[route] + #[utoipa::path]
 ```
 
-Poi si modificano due file condivisi (`src/api/mod.rs`, `src/db/mod.rs`) e la
-feature `reports` per aggiungere la relazione.
+Then you edit two shared files (`src/api/mod.rs`, `src/db.rs`) and the `reports`
+feature to add the relation.
 
 ---
 
-## 2. L'entità — `src/api/places/place_entity.rs`
+## 2. The entity — `src/api/places/place_entity.rs`
 
-L'**entity** è il modello puro, indipendente dal database: qualunque repository
-(che sia SurrealDB, Postgres, un mock in memoria…) deve persistere e restituire
-esattamente questo tipo. Non contiene né validazione né logica.
+The **entity** is the pure model, independent of the database: any repository
+(whether SurrealDB, Postgres, an in-memory mock…) must persist and return exactly
+this type. It holds neither validation nor logic.
 
 ```rust
 use serde::{Deserialize, Serialize};
@@ -95,25 +103,25 @@ pub struct Place {
 }
 ```
 
-Perché separarla dai DTO? Perché il DTO descrive ciò che **entra** dall'HTTP (con
-le sue regole di validazione), mentre l'entity descrive ciò che vive nel
-database. Tenerle separate evita di far "trapelare" dettagli HTTP nel dominio e
-viceversa.
+Why keep it separate from the DTOs? Because the DTO describes what **enters**
+from HTTP (with its validation rules), while the entity describes what lives in
+the database. Keeping them apart avoids "leaking" HTTP details into the domain
+and vice versa.
 
 ---
 
-## 3. I DTO e la validazione — `src/api/places/place_dto.rs`
+## 3. DTOs and validation — `src/api/places/place_dto.rs`
 
-Qui vivono tre tipi:
+Three types live here:
 
-- `CreatePlaceDto` / `UpdatePlaceDto`: cosa arriva nel body (con i decoratori
-  `#[validate(...)]`);
-- `PlaceResponse`: cosa torna al client;
-- la conversione DTO → entity (`into_entity`) e entity → response (`From`).
+- `CreatePlaceDto` / `UpdatePlaceDto`: what arrives in the body (with the
+  `#[validate(...)]` decorators);
+- `PlaceResponse`: what goes back to the client;
+- the DTO → entity conversion (`into_entity`) and entity → response (`From`).
 
-I campi sono **privat**? No: in questo progetto i DTO hanno campi `pub` (comodi
-per i test e per i service); la validazione avviene prima, nell'estrattore
-`ValidatedJson`.
+Are the fields **private**? No: in this project the DTOs have `pub` fields
+(convenient for tests and services); validation happens earlier, in the
+`ValidatedJson` extractor.
 
 ```rust
 use serde::{Deserialize, Serialize};
@@ -126,7 +134,7 @@ use crate::lib::Validate;
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Validate)]
 pub struct CreatePlaceDto {
     /// City name
-    #[schema(example = "Milano", min_length = 1, max_length = 200)]
+    #[schema(example = "Milan", min_length = 1, max_length = 200)]
     #[validate(
         custom(
             function = "crate::lib::validators::not_blank",
@@ -137,7 +145,7 @@ pub struct CreatePlaceDto {
     pub city: String,
 
     /// Street address
-    #[schema(example = "Via Roma 1", min_length = 1, max_length = 300)]
+    #[schema(example = "1 Main Street", min_length = 1, max_length = 300)]
     #[validate(
         custom(
             function = "crate::lib::validators::not_blank",
@@ -159,7 +167,7 @@ pub struct CreatePlaceDto {
     pub cap: String,
 
     /// Provenance
-    #[schema(example = "Comune di Milano", min_length = 1, max_length = 200)]
+    #[schema(example = "City of Milan", min_length = 1, max_length = 200)]
     #[validate(
         custom(
             function = "crate::lib::validators::not_blank",
@@ -187,7 +195,7 @@ impl CreatePlaceDto {
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Validate)]
 pub struct UpdatePlaceDto {
     /// New city name
-    #[schema(example = "Torino", min_length = 1, max_length = 200)]
+    #[schema(example = "Turin", min_length = 1, max_length = 200)]
     #[validate(
         custom(
             function = "crate::lib::validators::not_blank",
@@ -198,7 +206,7 @@ pub struct UpdatePlaceDto {
     pub city: String,
 
     /// New street address
-    #[schema(example = "Corso Francia 10", min_length = 1, max_length = 300)]
+    #[schema(example = "10 France Avenue", min_length = 1, max_length = 300)]
     #[validate(
         custom(
             function = "crate::lib::validators::not_blank",
@@ -220,7 +228,7 @@ pub struct UpdatePlaceDto {
     pub cap: String,
 
     /// New provenance
-    #[schema(example = "Comune di Torino", min_length = 1, max_length = 200)]
+    #[schema(example = "City of Turin", min_length = 1, max_length = 200)]
     #[validate(
         custom(
             function = "crate::lib::validators::not_blank",
@@ -251,16 +259,16 @@ pub struct PlaceResponse {
     #[schema(example = "550e8400-e29b-41d4-a716-446655440000")]
     pub id: String,
     /// City name
-    #[schema(example = "Milano")]
+    #[schema(example = "Milan")]
     pub city: String,
     /// Street address
-    #[schema(example = "Via Roma 1")]
+    #[schema(example = "1 Main Street")]
     pub address: String,
     /// Postal code
     #[schema(example = "20100")]
     pub cap: String,
     /// Provenance
-    #[schema(example = "Comune di Milano")]
+    #[schema(example = "City of Milan")]
     pub provenance: String,
 }
 
@@ -277,26 +285,26 @@ impl From<crate::api::places::place_entity::Place> for PlaceResponse {
 }
 ```
 
-Punti chiave:
+Key points:
 
-- `#[derive(Validate)]` + `#[validate(...)]` sono ciò che l'estrattore
-  `ValidatedJson` esegue **prima** che l'handler venga chiamato: se falliscono,
-  risponde `422 {code: validation_error, error, message}` senza mai entrare nel
-  service (stesso formato `{code, error, message}` della pipeline: body/query/
-  params malformati danno `400 {code: bad_request}`).
-- `not_blank` è un validator condiviso (`crate::lib::validators`): rifiuta
-  stringhe vuote o fatte solo di spazi.
-- `into_entity` normalizza (`.trim()`) e genera l'`id`: così il service riceve
-  dati già pronti.
-- `ToSchema` rende il DTO visibile in Swagger.
+- `#[derive(Validate)]` + `#[validate(...)]` are what the `ValidatedJson`
+  extractor runs **before** the handler is called: if they fail, it responds
+  `422 {code: validation_error, error, message}` without ever entering the
+  service (same `{code, error, message}` format as the pipeline: malformed
+  body/query/params give `400 {code: bad_request}`).
+- `not_blank` is a shared validator (`crate::lib::validators`, re-exported from
+  `oxidax-core`): it rejects empty or whitespace-only strings.
+- `into_entity` normalizes (`.trim()`) and generates the `id`, so the service
+  receives ready-made data.
+- `ToSchema` makes the DTO visible in Swagger.
 
 ---
 
-## 4. Il repository: trait — `src/api/places/place_repository.rs`
+## 4. The repository trait — `src/api/places/place_repository.rs`
 
-Il **trait** è il contratto di persistenza. È l'unico punto che il service
-conosce del database: cambiare backend = implementare questo trait, senza
-toccare service e controller.
+The **trait** is the persistence contract. It is the only thing the service
+knows about the database: switching backend = implementing this trait, without
+touching service and controllers.
 
 ```rust
 use async_trait::async_trait;
@@ -319,27 +327,29 @@ pub trait PlaceRepository: Send + Sync {
 }
 ```
 
-Note:
+Notes:
 
-- `#[async_trait]` permette i metodi `async` nei trait (in Rust sono "nativi" solo
-  con GAT; `async-trait` è il compromesso usato qui).
-- `Send + Sync` è richiesto perché il repository vive in un `Arc` condiviso tra i
-  task di tokio.
-- I metodi restituiscono `AppResult<...>`: gli errori DB vengono convertiti in
-  `AppError` centralmente (vedi `impl From<surrealdb::Error> for AppError`).
+- `#[async_trait]` allows `async` methods in traits (natively in Rust they are
+  only available with GATs; `async-trait` is the trade-off used here).
+- `Send + Sync` is required because the repository lives in an `Arc` shared
+  across tokio tasks.
+- The methods return `AppResult<...>`: database errors are converted into
+  `AppError` centrally (see `impl From<surrealdb::Error> for AppError`).
 
 ---
 
-## 5. Il repository: implementazione SurrealDB — `src/api/places/surreal_place_repository.rs`
+## 5. The SurrealDB repository — `src/api/places/surreal_place_repository.rs`
 
-Qui c'è **l'unico codice DB-specific** della feature. Struttura tipica (identica
-a `surreal_category_repository.rs`):
+This is the **only DB-specific code** of the feature. The typical structure
+(identical to `surreal_category_repository.rs`) is:
 
-- una costante `TABLE`;
-- un `...Row`: come i dati arrivano dal DB (l'`id` è un `RecordId` di SurrealDB);
-- un `...Content`: cosa si scrive nel `CONTENT` (senza `id`, gestito dal DB);
-- `new`, `ensure_schema`, una `into_entity` (record id → `uuid` dell'API) e i
-  metodi del trait.
+- a `TABLE` constant;
+- a `...Row`: how the data arrives from the database (the `id` is a SurrealDB
+  `RecordId`);
+- a `...Content`: what is written in the `CONTENT` (without `id`, managed by the
+  database);
+- `new`, `ensure_schema`, an `into_entity` (record id → API `uuid`) and the trait
+  methods.
 
 ```rust
 use async_trait::async_trait;
@@ -461,25 +471,27 @@ impl PlaceRepository for SurrealPlaceRepository {
 }
 ```
 
-Punti chiave:
+Key points:
 
-- `define_table` (helper in `src/db/surreal.rs`) esegue
-  `DEFINE TABLE IF NOT EXISTS place SCHEMALESS`: in SurrealDB 3 le tabelle non
-  nascono automaticamente.
-- `record_key_to_string` converte il record id di SurrealDB nella stringa usata
-  dall'API.
-- L'`?` sugli errori di SurrealDB sfrutta la conversione automatica in
-  `AppError::Database` (status `503`).
+- `define_table` (helper in `oxidax-core/src/db/surreal.rs`, re-exported as
+  `crate::db::define_table`) runs `DEFINE TABLE IF NOT EXISTS place SCHEMALESS`:
+  in SurrealDB 3 tables are not created automatically.
+- `record_key_to_string` converts the SurrealDB record id into the string used by
+  the API.
+- The `created_or_internal` helper turns a missing insert result into an
+  `AppError::Internal`.
+- Note the `.clone()` on every field when building the `CONTENT`: the content is
+  moved into the query while the original value is still needed afterwards (for
+  the return value), so cloning is required to avoid a partial move.
 
 ---
 
-## 6. Il service — `src/api/places/place_service.rs`
+## 6. The service — `src/api/places/place_service.rs`
 
-Il **service** è dove vive la logica di dominio. Qui però non c'è molta logica:
-i DTO arrivano già validati e convertiti, quindi il service si limita a
-orchestrare il repository e a tradurre l'assenza in un errore di dominio. Il
-`#[injectable]` di `more-di` genera il costruttore che risolve i campi dal
-container.
+The **service** is where domain logic lives. Here there is not much logic: the
+DTOs arrive already validated and converted, so the service just orchestrates the
+repository and turns absence into a domain error. `more-di`'s `#[injectable]`
+generates the constructor that resolves the fields from the container.
 
 ```rust
 use std::collections::HashMap;
@@ -569,24 +581,24 @@ fn not_found(id: &str) -> AppError {
 }
 ```
 
-Nota bene: i tre metodi "extra" (`exists`, `find`, `by_id`) esistono **solo** per
-permettere alla feature `reports` di validare e comporre la relazione senza
-duplicare query. È il modo corretto di far parlare due feature: un service
-espone metodi, l'altro service li chiama.
+Note: the three "extra" methods (`exists`, `find`, `by_id`) exist **only** to let
+the `reports` feature validate and compose the relation without duplicating
+queries. It is the correct way to make two features talk: one service exposes
+methods, the other service calls them.
 
 ---
 
-## 7. Il controller — `src/api/places/place_controller.rs`
+## 7. The controller — `src/api/places/place_controller.rs`
 
-Il **controller** è solo trasporto: niente logica, niente `if` di dominio.
-Ogni handler ha due attributi:
+The **controller** is only transport: no logic, no domain `if`s. Every handler has
+two attributes:
 
-- `#[route]`: **auto-registra** la rotta e il frammento OpenAPI (è la macro di
-  `framework-macros`); deve stare **sopra** `#[utoipa::path]`.
-- `#[utoipa::path(...)]`: dichiara metodo, path, tag e risposte documentate.
+- `#[route]`: **auto-registers** the route and the OpenAPI fragment (it is the
+  `oxidax-macro` macro); it must be **above** `#[utoipa::path]`.
+- `#[utoipa::path(...)]`: declares the method, path, tag and documented responses.
 
-L'handler prende il service con `State<Arc<PlaceService>>` (l'unico service che
-gli serve) e, quando c'è un body, `ValidatedJson<...>`.
+The handler takes the service with `State<Arc<PlaceService>>` (the only service it
+needs) and, when there is a body, `ValidatedJson<...>`.
 
 ```rust
 use std::sync::Arc;
@@ -603,7 +615,7 @@ use crate::framework::{ValidatedJson, route};
 // Route table and OpenAPI spec of the places, defined point-inline: every
 // handler is annotated with `#[utoipa::path(...)]` (HTTP method, path and
 // responses) and `#[route]`, which self-registers it in the static registry.
-// `features.rs`/`router.rs`/`docs.rs` never change when a handler is added.
+// The generic assembly in oxidax-core never changes when a handler is added.
 
 #[route]
 #[utoipa::path(
@@ -705,21 +717,21 @@ pub async fn delete_place(
 }
 ```
 
-Punti chiave:
+Key points:
 
-- Niente import di `Router`/`OpenApiRouter`/`routes!`: li mette la macro.
-- `Path(id): Path<String>` per i parametri di route; `ValidatedJson` per il body.
-- Gli import vengono dalla **facade** `crate::framework` (estrattori, `route`,
-  tipi di errore), così i controller di tutte le feature sono uniformi.
-- Il `tag` raggruppa gli endpoint in Swagger UI.
+- No import of `Router`/`OpenApiRouter`/`routes!`: the macro adds them.
+- `Path(id): Path<String>` for route params; `ValidatedJson` for the body.
+- The imports come from the **facade** `crate::framework` (extractors, `route`,
+  error types), so all feature controllers are uniform.
+- The `tag` groups the endpoints in Swagger UI.
 
 ---
 
-## 7-bis. Proteggere un handler — `#[IsGranted]`
+## 7-bis. Protecting a handler — `#[IsGranted]`
 
-Un handler può essere protetto dall'attributo `#[IsGranted]`, che va messo
-**sotto** `#[route]` (è la macro `#[route]` a consumarlo e a generare il
-guard; da solo non compila):
+A handler can be protected by the `#[IsGranted]` attribute, which must be placed
+**below** `#[route]` (it is the `#[route]` macro that consumes it and generates
+the guard; on its own it does not compile):
 
 ```rust
 #[route]
@@ -746,51 +758,53 @@ pub async fn get_me(
 }
 ```
 
-Forme ammesse:
+Allowed forms:
 
-- `#[IsGranted]`: qualsiasi chiamante autenticato.
-- `#[IsGranted(["admin"])]`: autenticato **e** ruolo fra quelli elencati (più
-  ruoli: `["admin", "editor"]`). Stringhe non ripetute.
+- `#[IsGranted]`: any authenticated caller.
+- `#[IsGranted(["admin"])]`: authenticated **and** role among those listed (more
+  roles: `["admin", "editor"]`). Strings must not be repeated.
 
-Cosa genera la macro (vedi `framework-macros/src/lib.rs`):
+What the macro generates (see `oxidax-macro/src/lib.rs`):
 
-- un layer `from_fn_with_state((JwtConfig, roles), guard)` sulla **singola
-  rotta**: niente layer globali, niente cablaggio manuale. Senza `#[IsGranted]`
-  la rotta resta pubblica e non dipende da `JwtConfig`.
-- il guard (`src/lib/auth/guard.rs`) estrae il bearer token, lo verifica e
-  inserisce `CurrentUser` nelle extensions della richiesta. Token
-  mancante/invalido/scaduto → `401`; ruolo non ammesso → `403`.
+- a `from_fn_with_state((JwtConfig, roles), guard)` layer on the **single route**:
+  no global layers, no manual wiring. Without `#[IsGranted]` the route stays
+  public and does not depend on `JwtConfig`.
+- the guard (`oxidax-core/src/auth/guard.rs`) extracts the bearer token, verifies
+  it and inserts `CurrentUser` into the request extensions. Missing/invalid/expired
+  token → `401`; disallowed role → `403`.
 
-Dentro l'handler l'utente corrente si legge con l'estrattore `CurrentUser`
-(re-export di `crate::framework`), che espone `user_id`, `identity_id` e
+Inside the handler the current user is read with the `CurrentUser` extractor
+(re-exported by `crate::framework`), which exposes `user_id`, `identity_id` and
 `role`.
 
-Nel `#[utoipa::path]` dichiara sempre `security(("accessToken" = []))` (oppure
-`("refreshToken" = [])` per i refresh) e i `401`/`403` documentati: gli scheme
-son definiti una tantum in `src/api/docs.rs`, quindi qui serve solo il
-riferimento.
+In `#[utoipa::path]` always declare `security(("accessToken" = []))` (the auth
+refresh endpoint uses `("refreshToken" = [])`) and the documented `401`/`403`:
+the schemes are defined once in `oxidax-core/src/docs.rs`, so here you only need
+the reference.
 
-Errori tipici:
+Common errors:
 
-- **`cannot find attribute IsGranted`**: l'attributo è senza `#[route]` sopra
-  di esso (o è fuori dall'handler).
-- **`expected #[IsGranted] or #[IsGranted(["admin"])]`**: forma non valida
-  (es. `#[IsGranted("admin")]` o liste non fatte di stringhe).
-- **`401` inatteso su una rotta protetta**: l'handler non usa l'estrattore
-  `CurrentUser`… oppure il token è scaduto: controlla `exp`/leeway (jsonwebtoken
-  di default concede 60 secondi di leeway).
+- **`cannot find attribute IsGranted`**: the attribute has no `#[route]` above it
+  (or is outside the handler).
+- **`expected #[IsGranted] or #[IsGranted(["admin"])]`**: invalid form (e.g.
+  `#[IsGranted("admin")]` or lists not made of strings).
+- **unexpected `401` on a protected route**: the handler does not use the
+  `CurrentUser` extractor… or the token is expired: check `exp`/leeway
+  (`jsonwebtoken` grants 60 seconds of leeway by default).
 
 ---
 
-## 7-ter. Paginare una lista — `PaginationQuery` + `Paged<T>`
+## 7-ter. Paginating a list — `PaginationQuery` + `Paged<T>`
 
-Tutte le liste del framework (`categories`, `places`, `reports`, `users`)
-condividono la stessa paginazione riutilizzabile (`src/lib/pagination.rs`), così
-non serve riscriverla per feature. Il contratto è: **body = array JSON** di
-sempre, **totale elementi nell'header `X-TOTAL-LIST`** (nessun envelope).
+Every list in the framework (`categories`, `places`, `reports`, `users`) shares
+the same reusable pagination (`oxidax-core/src/pagination.rs`, re-exported as
+`crate::lib::pagination`), so there is no need to rewrite it per feature. The
+contract is: **body = the usual JSON array**, **total items in the
+`X-TOTAL-LIST` header** (no envelope).
 
-Lato **repository** aggiungi i due metodi paginati al trait e all'implementazione,
-riusando gli helper di `src/db/query.rs`:
+On the **repository** side add the two paginated methods to the trait and the
+implementation, reusing the helpers in `oxidax-core/src/db/query.rs` (re-exported
+as `crate::db::query`):
 
 ```rust
 // place_repository.rs
@@ -810,7 +824,7 @@ async fn count(&self) -> AppResult<u64> {
 }
 ```
 
-Lato **service** ritorna `Paged<T>` (elementi + totale):
+On the **service** side return `Paged<T>` (items + total):
 
 ```rust
 use crate::lib::pagination::{Paged, Pagination};
@@ -825,8 +839,8 @@ pub async fn list_page(&self, pagination: Pagination) -> AppResult<Paged<PlaceRe
 }
 ```
 
-Lato **controller** aggiungi l'estrattore `PaginationQuery` e chiama
-`into_response()`: la macro `#[route]` non cambia, il corpo resta l'array.
+On the **controller** side add the `PaginationQuery` extractor and call
+`into_response()`: the `#[route]` macro does not change, the body stays the array.
 
 ```rust
 #[route]
@@ -835,14 +849,14 @@ Lato **controller** aggiungi l'estrattore `PaginationQuery` e chiama
     path = "/api/places",
     tag = "places",
     params(
-        ("page" = Option<u64>, Query, description = "Pagina, 1-based (default 1)", example = 1),
-        ("limit" = Option<u64>, Query, description = "Elementi per pagina, 1-100 (default 20)", example = 20),
+        ("page" = Option<u64>, Query, description = "Page, 1-based (default 1)", example = 1),
+        ("limit" = Option<u64>, Query, description = "Items per page, 1-100 (default 20)", example = 20),
     ),
     responses(
-        (status = 200, description = "Lista paginata; totale in `X-TOTAL-LIST`",
+        (status = 200, description = "Paginated list; total in `X-TOTAL-LIST`",
             body = [PlaceResponse],
-            headers(("X-TOTAL-LIST" = u64, description = "Totale elementi su tutte le pagine"))),
-        (status = 422, description = "Parametri di paginazione non validi", body = ErrorResponse),
+            headers(("X-TOTAL-LIST" = u64, description = "Total items across all pages"))),
+        (status = 422, description = "Invalid pagination parameters", body = ErrorResponse),
         (status = 503, description = "Database unavailable", body = ErrorResponse),
     ),
 )]
@@ -855,24 +869,26 @@ pub async fn list_places(
 }
 ```
 
-Note:
+Notes:
 
-- `page`/`limit` sono `Option` con default (`1` e `20`) applicati da
-  `Pagination::new`; il range è validato (`422` fuori range, `400` se non
-  numerici).
-- Più estrattori query convivono nello stesso handler: i filtri (es.
-  `?role=`) usano il proprio DTO (`ValidatedQuery<UserListQueryDto>`) accanto a
+- `page`/`limit` are `Option` with defaults (`1` and `20`) applied by
+  `Pagination::new`; the range is validated (`422` out of range, `400` if not
+  numeric).
+- Multiple query extractors coexist in the same handler: filters (e.g. `?role=`)
+  use their own DTO (`ValidatedQuery<UserListQueryDto>`) alongside
   `ValidatedQuery<PaginationQuery>`.
-- L'ordinamento non è ancora implementato: senza `ORDER BY` l'ordine delle
-  pagine non è garantito.
+- Ordering is not implemented yet: without `ORDER BY` the page order is not
+  guaranteed.
 
 ---
 
-## 8. Il wiring della feature — `src/api/places/mod.rs`
+## 8. The feature wiring — `src/api/places/mod.rs`
 
-Questo file fa **due sole cose**: (1) dichiara i sottomoduli; (2) registra la
-feature nel container DI tramite `inventory::submit!`. È l'unica riga "manuale"
-di DI della feature.
+This file does **only two things**: (1) declares the submodules; (2) registers the
+feature's service in the DI container through `inventory::submit!`. It is the only
+"manual" DI line of the feature. The concrete repository is NOT registered here:
+it is registered centrally in `src/db.rs` (see §10), so the feature stays
+database-agnostic.
 
 ```rust
 pub mod place_controller;
@@ -885,14 +901,13 @@ pub mod surreal_place_repository;
 use di::Injectable;
 use di::ServiceCollection;
 
-use crate::db;
-use crate::framework::{Feature, register_repository};
+use crate::framework::Feature;
 use place_service::PlaceService;
 
 // All the DI wiring lives here; every route is auto-registered by `#[route]`
-// on the handlers in `place_controller`.
-fn register(repositories: &db::Repositories, services: &mut ServiceCollection) {
-    register_repository(services, repositories.places.clone());
+// on the handlers in `place_controller`. The repository is registered centrally
+// in `crate::db`.
+fn register(services: &mut ServiceCollection) {
     services.add(PlaceService::singleton());
 }
 
@@ -902,139 +917,109 @@ inventory::submit! {
 }
 ```
 
-Spiegazione:
+Explanation:
 
-- `register_repository` registra il repository concreto **sotto il suo trait**
-  (`Arc<dyn PlaceRepository>`), così il service dipende dal contratto, non
-  dall'implementazione.
-- `PlaceService::singleton()` registra il service (costruito da `#[injectable]`).
-- `Feature::new(order, register)`: `order` è l'ordine di registrazione. Le
-  feature esistenti usano `categories = 0`, `reports = 1`.
-  **Mettiamo `places = 1` e spostiamo `reports = 2`** (vedi §11), così i
-  repository/service usati dai report sono registrati prima. In pratica
-  `more-di` inietta in modo lazy (l'ordine è tollerante), ma tenerlo esplicito
-  è più sicuro.
-- L'`inventory::submit!` è ciò che rende la feature "zero-touch":
-  `features.rs` la trova da solo al prossimo avvio, senza modifiche.
+- `PlaceService::singleton()` registers the service (built by `#[injectable]`,
+  which resolves the repository from the container by asking for
+  `Arc<dyn PlaceRepository>`).
+- `Feature::new(order, register)`: `order` is the registration order. The
+  existing features use `categories = 0`, `auth = 0`, `users = 0`,
+  `places = 1`, `reports = 2`. **Set `places = 1` and move `reports = 2`** (see
+  §11), so the services used by reports are registered first. In practice
+  `more-di` injects lazily (order is tolerant), but keeping it explicit is safer.
+- `inventory::submit!` is what makes the feature "zero-touch": the generic
+  assembly in `oxidax-core` finds it on its own, with no edits.
 
 ---
 
-## 9. Dichiarare il modulo — `src/api/mod.rs` (modifica manuale 1)
+## 9. Declare the module — `src/api/mod.rs` (manual edit 1)
 
-Aggiungi una riga, in ordine alfabetico:
+Add one line, in alphabetical order:
 
 ```rust
+pub mod auth;
 pub mod categories;
-pub mod docs;
-pub mod features;
-pub mod places; // <-- nuovo
+pub mod places; // <-- new
 pub mod reports;
-pub mod router;
+pub mod users;
 ```
 
-Puoi vedere la necessità di questa riga come il prezzo da pagare per non dover
-toccare `features.rs`/`router.rs`: Rust deve sapere che esiste il modulo.
+You can read the need for this line as the price to pay to avoid touching the
+generic assembly: Rust must know the module exists.
 
 ---
 
-## 10. Registrare il repository — `src/db/mod.rs` (modifica manuale #2)
+## 10. Register the repository — `src/db.rs` (manual edit 2)
 
-`db::Repositories` è l'aggregatore dei repository concreti. È l'unico punto
-condiviso che va aggiornato, perché è lui che viene passato a ogni
-`Feature::register`. Nuova versione:
+`db::Repositories` is the aggregate of the concrete repositories, and
+`register_repositories` is the single wired point that registers each of them
+under its trait in the DI container. Three small additions:
 
 ```rust
-mod surreal;
-
-use std::sync::Arc;
-
-use surrealdb::Surreal;
-use surrealdb::engine::any::Any;
-
-use crate::api::categories::category_repository::CategoryRepository;
-use crate::api::categories::surreal_category_repository::SurrealCategoryRepository;
+// 1. imports
 use crate::api::places::place_repository::PlaceRepository;
 use crate::api::places::surreal_place_repository::SurrealPlaceRepository;
-use crate::api::reports::report_repository::ReportRepository;
-use crate::api::reports::surreal_report_repository::SurrealReportRepository;
-use crate::config::{Config, DbBackend};
-use crate::errors::AppResult;
 
-pub use surreal::{define_table, record_key_to_string};
-
-/// All the application repositories, built on the same connection.
+// 2. the aggregate gains a field
 pub struct Repositories {
     pub reports: Arc<dyn ReportRepository>,
     pub categories: Arc<dyn CategoryRepository>,
-    pub places: Arc<dyn PlaceRepository>,
+    pub places: Arc<dyn PlaceRepository>, // <-- new
+    pub users: Arc<dyn UserRepository>,
+    pub user_identities: Arc<dyn UserIdentityRepository>,
 }
 
-/// Creates the repositories based on the configured backend.
-///
-/// Switching database means implementing the `ReportRepository` and
-/// `CategoryRepository` traits and adding a new branch here: the rest of the
-/// application (services, controllers) does not change.
-pub async fn repositories(config: &Config) -> AppResult<Repositories> {
-    let url = match config.db_backend {
-        DbBackend::Memory => "mem://",
-        DbBackend::Surreal => config.surreal_url.as_str(),
-    };
-
-    from_connection(surreal::connect(url, config).await?).await
-}
-
-/// Embedded in-memory repositories (SurrealDB `mem://`): used by the tests and
-/// available at runtime with `DB_BACKEND=memory`.
-pub async fn memory_repositories() -> AppResult<Repositories> {
-    repositories(&Config::memory()).await
-}
-
-async fn from_connection(db: Surreal<Any>) -> AppResult<Repositories> {
-    let reports = SurrealReportRepository::new(db.clone());
-    reports.ensure_schema().await?;
-
-    let categories = SurrealCategoryRepository::new(db.clone());
-    categories.ensure_schema().await?;
-
-    let places = SurrealPlaceRepository::new(db);
-    places.ensure_schema().await?;
-
-    Ok(Repositories {
-        reports: Arc::new(reports),
-        categories: Arc::new(categories),
-        places: Arc::new(places),
-    })
+// 3. register_repositories gains one line (the single DI wired point)
+pub fn register_repositories(repositories: &Repositories, services: &mut ServiceCollection) {
+    register_repository(services, repositories.reports.clone());
+    register_repository(services, repositories.categories.clone());
+    register_repository(services, repositories.places.clone()); // <-- new
+    register_repository(services, repositories.users.clone());
+    register_repository(services, repositories.user_identities.clone());
 }
 ```
 
-Punti chiave:
+And in `from_connection`, build it on the shared connection and create its table:
 
-- Ogni repository condivide la **stessa connessione** (`db.clone()`); l'ultimo
-  può prenderla "owned" (`db`).
-- `ensure_schema()` va chiamato per ogni nuovo repository: crea la tabella
-  `place` in SurrealDB.
-- Questo è, di fatto, l'unico punto "non zero-touch" delle feature. Se in
-  futuro vorrai eliminarlo, il passo è rendere `Repositories` una mappa
-  dinamica (es. per `TypeId`) popolata dalle feature stesse.
+```rust
+let places = SurrealPlaceRepository::new(db.clone());
+places.ensure_schema().await?;
+```
+
+and add it to the returned struct:
+
+```rust
+Ok(Repositories {
+    reports: Arc::new(reports),
+    categories: Arc::new(categories),
+    places: Arc::new(places), // <-- new
+    users: Arc::new(users),
+    user_identities: Arc::new(user_identities),
+})
+```
+
+Key points:
+
+- Every repository shares the **same connection** (`db.clone()`); the last one
+  may take it "owned" (`db`).
+- `ensure_schema()` must be called for every new repository: it creates the
+  `place` table in SurrealDB.
+- `register_repository(services, repositories.places.clone())` registers the
+  concrete repository **under its trait** (`Arc<dyn PlaceRepository>`), so the
+  service depends on the contract, not the implementation.
+- This is, in practice, the only "non zero-touch" point of a feature. If you
+  later want to remove it, the step is to make `Repositories` a dynamic map
+  (e.g. keyed by `TypeId`) populated by the features themselves.
 
 ---
 
-## 10-bis. Dichiarare il modulo `places` anche per la collection
+## 11. The relation: `reports` → `places`
 
-Ricordati che va dichiarato `pub mod places;` in `src/api/mod.rs` (§9) **prima**
-che `src/db/mod.rs` possa riferirsi a `crate::api::places::...`. Se compili dopo
-aver fatto solo §8, l'errore sarà "unresolved module `places`": è normale,
-manca §9.
-
----
-
-## 11. La relazione: `reports` → `places`
-
-Un report può ora puntare a un place. Il modello è **lo stesso** già usato per
-`categories`: un campo opzionale `place_id` nell'entity, validato a livello DTO
-(formato) e service (esistenza), e l'oggetto completo annidato nella risposta.
-La risposta espone **solo** l'oggetto annidato `place` (non `place_id`), come già
-fatto per `category`.
+A report can now point to a place. The model is **the same** already used for
+`categories`: an optional `place_id` field in the entity, validated at the DTO
+level (format) and service level (existence), and the full object nested in the
+response. The response exposes **only** the nested `place` object (not
+`place_id`), as already done for `category`.
 
 ### 11.1 `src/api/reports/report_entity.rs`
 
@@ -1053,8 +1038,8 @@ pub struct Report {
 
 ### 11.2 `src/api/reports/report_dto.rs`
 
-Aggiungi a **`CreateReportDto`** e **`UpdateReportDto`** un campo `place_id`
-identico (per forma) a `category_id`:
+Add to **`CreateReportDto`** and **`UpdateReportDto`** a `place_id` field
+identical (in shape) to `category_id`:
 
 ```rust
     /// Id of the associated place (optional; `null` or absent removes the relationship)
@@ -1066,9 +1051,9 @@ identico (per forma) a `category_id`:
     pub place_id: Option<String>,
 ```
 
-Nel rispettivo `into_entity`, aggiungi `place_id: self.place_id,`.
+In the respective `into_entity`, add `place_id: self.place_id,`.
 
-Nella **`ReportResponse`** aggiungi l'oggetto annidato (non l'id):
+In **`ReportResponse`** add the nested object (not the id):
 
 ```rust
     /// Associated category (full object, present only if the relationship exists)
@@ -1077,13 +1062,14 @@ Nella **`ReportResponse`** aggiungi l'oggetto annidato (non l'id):
     pub place: Option<PlaceResponse>,
 ```
 
-Aggiungi l'import in cima al file:
+Add the import at the top of the file:
 
 ```rust
 use crate::api::places::place_dto::PlaceResponse;
 ```
 
-E sostituisci l'`impl From` con la versione a tre elementi:
+And replace the `impl From` with the multi-field version (the real code also
+carries `created_by`; keep it and add `place`):
 
 ```rust
 impl
@@ -1091,13 +1077,15 @@ impl
         crate::api::reports::report_entity::Report,
         Option<CategoryResponse>,
         Option<PlaceResponse>,
+        Option<UserSummaryResponse>,
     )> for ReportResponse
 {
     fn from(
-        (report, category, place): (
+        (report, category, place, created_by): (
             crate::api::reports::report_entity::Report,
             Option<CategoryResponse>,
             Option<PlaceResponse>,
+            Option<UserSummaryResponse>,
         ),
     ) -> Self {
         Self {
@@ -1106,6 +1094,7 @@ impl
             description: report.description,
             category,
             place,
+            created_by,
         }
     }
 }
@@ -1113,17 +1102,19 @@ impl
 
 ### 11.3 `src/api/reports/surreal_report_repository.rs`
 
-Aggiungi `place_id: Option<String>` a `ReportRow` **e** `ReportContent`, poi:
+Add `place_id: Option<String>` to `ReportRow` **and** `ReportContent`, then:
 
 - in `into_entity`: `place_id: row.place_id,`
-- in `insert` e `replace`, dentro `ReportContent`: `place_id: report.place_id.clone(),`
+- in `insert` and `replace`, inside `ReportContent`:
+  `place_id: report.place_id.clone(),`
 
-(Il trait `ReportRepository` **non cambia**: l'entity porta già il campo.)
+(The `ReportRepository` trait **does not change**: the entity already carries the
+field.)
 
 ### 11.4 `src/api/reports/report_service.rs`
 
-Il service dei report ora dipende anche da `PlaceService`. Aggiungi il campo,
-la validazione dell'esistenza, la decorazione e l'indicizzazione per la lista:
+The reports service now also depends on `PlaceService`. Add the field, the
+existence validation, the decoration and the indexing for the list:
 
 ```rust
 use crate::api::places::place_dto::PlaceResponse;
@@ -1135,11 +1126,12 @@ pub struct ReportService {
     repository: Arc<dyn ReportRepository>,
     categories: Arc<CategoryService>,
     places: Arc<PlaceService>,
+    users: Arc<UserService>,
 }
 
 impl ReportService {
-    pub async fn create(&self, dto: CreateReportDto) -> AppResult<ReportResponse> {
-        let report = dto.into_entity();
+    pub async fn create(&self, user_id: &str, dto: CreateReportDto) -> AppResult<ReportResponse> {
+        let report = dto.into_entity(user_id.to_string());
         self.validate_category_id(&report.category_id).await?;
         self.validate_place_id(&report.place_id).await?;
 
@@ -1149,23 +1141,7 @@ impl ReportService {
 
     pub async fn list(&self) -> AppResult<Vec<ReportResponse>> {
         let reports = self.repository.find_all().await?;
-        let categories = self.categories.by_id().await?;
-        let places = self.places.by_id().await?;
-
-        Ok(reports
-            .into_iter()
-            .map(|report| {
-                let category = report
-                    .category_id
-                    .as_ref()
-                    .and_then(|id| categories.get(id).cloned());
-                let place = report
-                    .place_id
-                    .as_ref()
-                    .and_then(|id| places.get(id).cloned());
-                (report, category, place).into()
-            })
-            .collect())
+        self.decorate_all(reports).await
     }
 
     pub async fn update(&self, id: &str, dto: UpdateReportDto) -> AppResult<ReportResponse> {
@@ -1181,7 +1157,7 @@ impl ReportService {
         self.decorate(report).await
     }
 
-    // ... invariate: get, delete ...
+    // ... unchanged: get, delete ...
 
     /// Validates the relationship with places (same logic as categories).
     async fn validate_place_id(&self, place_id: &Option<String>) -> AppResult<()> {
@@ -1193,11 +1169,40 @@ impl ReportService {
         Ok(())
     }
 
-    /// Composes the response by nesting the `category` and `place` objects.
+    /// Composes the response by nesting the `category`, `place` and
+    /// `created_by` objects.
     async fn decorate(&self, report: Report) -> AppResult<ReportResponse> {
         let category = self.category_of(&report).await?;
         let place = self.place_of(&report).await?;
-        Ok((report, category, place).into())
+        let created_by = self.creator_of(&report).await?;
+        Ok((report, category, place, created_by).into())
+    }
+
+    /// Decorates a whole list resolving the relations with one read per table
+    /// (index maps) instead of N+1 queries per element.
+    async fn decorate_all(&self, reports: Vec<Report>) -> AppResult<Vec<ReportResponse>> {
+        let categories = self.categories.by_id().await?;
+        let places = self.places.by_id().await?;
+        let users = self.users.by_id().await?;
+
+        Ok(reports
+            .into_iter()
+            .map(|report| {
+                let category = report
+                    .category_id
+                    .as_ref()
+                    .and_then(|id| categories.get(id).cloned());
+                let place = report
+                    .place_id
+                    .as_ref()
+                    .and_then(|id| places.get(id).cloned());
+                let created_by = report
+                    .user_id
+                    .as_ref()
+                    .and_then(|id| users.get(id).cloned());
+                (report, category, place, created_by).into()
+            })
+            .collect())
     }
 
     async fn place_of(&self, report: &Report) -> AppResult<Option<PlaceResponse>> {
@@ -1209,14 +1214,14 @@ impl ReportService {
 }
 ```
 
-Il controller dei report **non cambia** (continua a chiamare `service.create`,
-ecc.); il `#[utoipa::path]` già documenta `ReportResponse`, che ora include
-anche `place`.
+The reports controller **does not change** (it keeps calling `service.create`,
+etc.); the `#[utoipa::path]` already documents `ReportResponse`, which now also
+includes `place`.
 
-### 11.5 Ordine della feature `reports`
+### 11.5 Order of the `reports` feature
 
-In `src/api/reports/mod.rs` cambia l'ordine da `1` a `2`, perché ora `reports`
-dipende anche da `places`:
+In `src/api/reports/mod.rs` change the order from `1` to `2`, because `reports`
+now also depends on `places`:
 
 ```rust
 // Zero-touch self-registration in the feature registry.
@@ -1225,25 +1230,25 @@ inventory::submit! {
 }
 ```
 
-### Nota sull'iniezione dei service
+### Note on service injection
 
-`ReportService` riceve `Arc<PlaceService>` e `Arc<CategoryService>`: **non**
-duplicare la logica dei place nei report, e **non** parlare direttamente dei
-repository altrui. La regola è: un service dipende da altri **service** (non dai
-loro repository) e le dipendenze devono formare un grafo **aciclico**.
+`ReportService` receives `Arc<PlaceService>` and `Arc<CategoryService>`: do **not**
+duplicate the place logic inside reports, and do **not** talk directly to other
+features' repositories. The rule is: a service depends on other **services** (not
+on their repositories) and the dependencies must form an **acyclic** graph.
 
 ---
 
-## 12. Test (consigliati)
+## 12. Tests (recommended)
 
-I test di integrazione colpiscono l'HTTP reale con backend `mem://`. Aggiungi
-`tests/report/places.rs` e dichiaralo in `tests/report/main.rs`:
+Integration tests hit real HTTP with the `mem://` backend. Add
+`tests/report/places.rs` and declare it in `tests/report/main.rs`:
 
 ```rust
 mod places;
 ```
 
-Esempio minimo (stesso stile di `categories.rs`):
+Minimal example (same style as `categories.rs`):
 
 ```rust
 //! Place CRUD over HTTP and the report → place relation.
@@ -1264,10 +1269,10 @@ async fn place_full_crud_cycle() {
             "POST",
             "/api/places",
             json!({
-                "city": "Milano",
-                "address": "Via Roma 1",
+                "city": "Milan",
+                "address": "1 Main Street",
                 "cap": "20100",
-                "provenance": "Comune di Milano",
+                "provenance": "City of Milan",
             }),
         ))
         .await
@@ -1275,14 +1280,14 @@ async fn place_full_crud_cycle() {
     let status = response.status();
     let created = json_body(response).await;
     assert_eq!(status, StatusCode::CREATED, "{created}");
-    let id = created["id"].as_str().expect("id presente").to_string();
+    let id = created["id"].as_str().expect("id present").to_string();
 
     let response = app
         .oneshot(json_request(
             "POST",
             "/api/reports",
             json!({
-                "name": "Report con luogo",
+                "name": "Report with place",
                 "description": "desc",
                 "place_id": id,
             }),
@@ -1297,62 +1302,69 @@ async fn place_full_crud_cycle() {
 
 ---
 
-## 13. Verifica e avvio
+## 13. Build and run
+
+Inside the dev container (or on any host with the toolchain):
 
 ```bash
-# compila tutto (binari, test, esempi)
-docker exec -u vscode -w /workspace axum-api_devcontainer-app-1 cargo check --all-targets
+# compile everything (binaries, tests, examples)
+cargo check --workspace --all-targets
 
 # format, lint, test
-docker exec -u vscode -w /workspace axum-api_devcontainer-app-1 cargo fmt
-docker exec -u vscode -w /workspace axum-api_devcontainer-app-1 cargo clippy --all-targets -- -D warnings
-docker exec -u vscode -w /workspace axum-api_devcontainer-app-1 cargo test
+cargo fmt --all
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
 ```
 
-Poi avvia e apri la documentazione: i nuovi endpoint `places` saranno già in
-Swagger UI su `http://localhost:3000/swagger-ui` (spec a
-`/api-docs/openapi.json`), **senza aver toccato** `features.rs`, `router.rs` o
-`docs.rs`.
+Then start the project and open the documentation: the new `places` endpoints are
+already in Swagger UI at `http://localhost:3000/swagger-ui` (spec at
+`/api-docs/openapi.json`), **without having touched** the generic assembly in
+`oxidax-core`.
 
 ---
 
-## 13-bis. Riepilogo: checklist
+## 13-bis. Summary: checklist
 
-1. `src/api/places/` con i 7 file (entity, dto, repository, surreal, service,
-   controller, mod) — §2–§8.
-- [ ] dichiara `pub mod places;` in `src/api/mod.rs` (§9)
-- [ ] aggiungi il repository in `src/db/mod.rs` (`Repositories` + `from_connection`) (§10)
-- [ ] collega `reports` (entity, dto, surreal repo, service, `order`) (§11)
-- [ ] se l'endpoint è protetto, `#[IsGranted]` + `security(...)` nel `utoipa::path` (§7-bis)
-- [ ] se l'endpoint è una lista paginata, `find_page`/`count` nel repo + `Paged<T>` nel service + `PaginationQuery` nel controller (§7-ter)
-- [ ] test + `cargo test`/`clippy`/`fmt` (§12–13)
+1. `src/api/places/` with the 7 files (entity, dto, repository, surreal, service,
+   controller, mod) — §2–§8 (or just run `cargo xtask new-feature`).
+- [ ] declare `pub mod places;` in `src/api/mod.rs` (§9)
+- [ ] add the repository in `src/db.rs` (`Repositories` + `register_repositories` +
+  `from_connection`) (§10)
+- [ ] connect `reports` (entity, dto, surreal repo, service, `order`) (§11)
+- [ ] if the endpoint is protected, `#[IsGranted]` + `security(...)` in the
+  `utoipa::path` (§7-bis)
+- [ ] if the endpoint is a paginated list, `find_page`/`count` in the repo +
+  `Paged<T>` in the service + `PaginationQuery` in the controller (§7-ter)
+- [ ] tests + `cargo test`/`clippy`/`fmt` (§12–13)
 
-Ricapitolando i file **condivisi** toccati (e perché):
+To recap the **shared** files touched (and why):
 
-| File                 | Modifica                        | Motivo                                              |
-| -------------------- | ------------------------------- | --------------------------------------------------- |
-| `src/api/mod.rs`     | `pub mod places;`               | far conoscere il modulo al crate                    |
-| `src/db/mod.rs`      | campo + costruzione + schema    | aggregatore dei repository concreti                 |
-| `src/api/reports/*`  | campo `place_id` + decorazione  | relazione report → place                            |
+| File                | Change                                 | Reason                                       |
+| ------------------- | -------------------------------------- | -------------------------------------------- |
+| `src/api/mod.rs`    | `pub mod places;`                      | make the module known to the crate           |
+| `src/db.rs`         | field + registration + schema          | aggregate of the concrete repositories       |
+| `src/api/reports/*` | `place_id` field + decoration          | report → place relation                      |
 
 ---
 
-## 13-ter. Errori comuni
+## 13-ter. Common errors
 
-- **`unresolved module places`**: manca `pub mod places;` in `src/api/mod.rs`.
-- **`missing #[utoipa::path(...)]`** (errore della macro `#[route]`): hai messo
-  `#[route]` senza l'attributo `#[utoipa::path]` (oppure sotto di esso: deve
-  stare **sopra**).
-- **`expected a State<Arc<T>> argument`** (errore della macro `#[route]`):
-  l'handler non ha il parametro `State<Arc<...>>`.
-- **DI: "service not registered"**: manca `services.add(PlaceService::singleton())`
-  nel `register` di `places/mod.rs`, oppure il `Feature::new` non è stato
-  "raccolto" (controlla di aver messo `inventory::submit!`).
-- **404 su `/api/places`**: il repository non è in `db::Repositories` (manca §10)
-  o la tabella non viene creata (`ensure_schema`).
-- **422 inatteso**: controlla i decoratori `#[validate(...)]` nel DTO (i
-  messaggi di validazione sono in inglese).
-- **Campo `place` sempre `null`**: nel service dei report manca la chiamata a
-  `place_of`/`by_id` dentro `decorate`/`list`.
-- **`cannot find attribute IsGranted`**: manca `#[route]` sopra `#[IsGranted]`
-  (vedi §7-bis).
+- **`unresolved module places`**: the `pub mod places;` line in
+  `src/api/mod.rs` is missing.
+- **`missing #[utoipa::path(...)]`** (error from the `#[route]` macro): you put
+  `#[route]` without the `#[utoipa::path]` attribute (or below it: it must be
+  **above**).
+- **`expected a State<Arc<T>> argument`** (error from the `#[route]` macro): the
+  handler has no `State<Arc<...>>` parameter.
+- **DI: "service not registered"**: the
+  `services.add(PlaceService::singleton())` line is missing in the `register` of
+  `places/mod.rs`, or the `Feature::new` was not "collected" (check that you added
+  `inventory::submit!`).
+- **404 on `/api/places`**: the repository is not in `db::Repositories` (§10
+  missing) or the table is not created (`ensure_schema`).
+- **unexpected 422**: check the `#[validate(...)]` decorators in the DTO (the
+  validation messages are in English).
+- **`place` field always `null`**: in the reports service the call to
+  `place_of`/`by_id` is missing inside `decorate`/`decorate_all`.
+- **`cannot find attribute IsGranted`**: the `#[route]` above `#[IsGranted]` is
+  missing (see §7-bis).

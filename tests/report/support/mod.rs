@@ -1,4 +1,4 @@
-//! Shared test utilities: app application, in-memory repository,
+//! Shared test utilities: application assembly, in-memory repository,
 //! JSON body parsing and request building.
 
 use std::sync::Arc;
@@ -6,16 +6,16 @@ use std::sync::Arc;
 use axum::Router;
 use axum::body::{Body, to_bytes};
 use axum::http::{Request, StatusCode};
-use axum_api::api;
-use axum_api::api::reports::report_service::ReportService;
-use axum_api::config::Config;
+use oxidax::api::reports::report_service::ReportService;
+use oxidax::app;
+use oxidax::config::Config;
 use serde_json::{Value, json};
 use tower::ServiceExt;
 
 /// Report service with the real dependencies (category service included),
 /// resolved from the DI provider with an in-memory backend.
 pub async fn report_service() -> Arc<ReportService> {
-    let provider = api::features::provider(&Config::memory())
+    let (_, provider) = app::build_with_provider(&Config::memory())
         .await
         .expect("provider");
     provider.get_required::<ReportService>()
@@ -23,9 +23,7 @@ pub async fn report_service() -> Arc<ReportService> {
 
 /// App with an in-memory backend, built from the general router the same way `main` does.
 pub async fn app() -> Router {
-    api::router::build(&Config::memory())
-        .await
-        .expect("applicazione")
+    app::build(&Config::memory()).await.expect("applicazione")
 }
 
 /// App and its DI provider sharing the same in-memory database.
@@ -34,19 +32,9 @@ pub async fn app() -> Router {
 /// admin, which has no endpoint) and then call the API over HTTP: the two
 /// `mem://` connections would otherwise be two separate databases.
 pub async fn app_and_provider() -> (Router, di::ServiceProvider) {
-    let provider = api::features::provider(&Config::memory())
+    app::build_with_provider(&Config::memory())
         .await
-        .expect("provider");
-    let bundles = api::features::route_bundles(&provider);
-    let (routers, route_apis): (Vec<_>, Vec<_>) = bundles.into_iter().unzip();
-
-    let mut router = Router::new();
-    for route in routers {
-        router = router.merge(route);
-    }
-    router = router.merge(api::docs::swagger_router(api::docs::build(route_apis)));
-
-    (router, provider)
+        .expect("provider")
 }
 
 /// Reads the response body as JSON.
@@ -97,17 +85,17 @@ pub async fn authorized_get(app: &Router, uri: &str, token: &str) -> (StatusCode
 /// need "some authenticated caller" and do not care about the user behind it
 /// (the guard verifies the signature only, without database round trips).
 pub async fn mint_access_token(user_id: &str) -> String {
-    let provider = api::features::provider(&Config::memory())
+    let (_, provider) = app::build_with_provider(&Config::memory())
         .await
         .expect("provider");
-    let jwt = provider.get_required::<axum_api::lib::auth::JwtConfig>();
-    let now = axum_api::lib::auth::JwtConfig::now();
+    let jwt = provider.get_required::<oxidax::lib::auth::JwtConfig>();
+    let now = oxidax::lib::auth::JwtConfig::now();
 
-    jwt.encode(&axum_api::lib::auth::jwt::Claims {
+    jwt.encode(&oxidax::lib::auth::jwt::Claims {
         sub: user_id.to_string(),
         identity_id: uuid::Uuid::new_v4().to_string(),
         role: "user".to_string(),
-        token_use: axum_api::lib::auth::jwt::ACCESS.to_string(),
+        token_use: oxidax::lib::auth::jwt::ACCESS.to_string(),
         jti: uuid::Uuid::new_v4().to_string(),
         iat: now,
         exp: now + 900,
