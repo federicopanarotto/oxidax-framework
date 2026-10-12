@@ -163,12 +163,12 @@ async fn users_list_rejects_unknown_role() {
 
     let (status, body) = authorized_get(&app, "/api/users?role=superuser", &admin).await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{body}");
-    assert_eq!(body["error"], "Validation error on Query", "{body}");
-    let details = body["details"].as_array().expect("details");
+    assert_eq!(body["code"], "validation_error", "{body}");
+    assert_eq!(body["error"], "422 Unprocessable Entity", "{body}");
     assert!(
-        details
-            .iter()
-            .any(|detail| detail.as_str().is_some_and(|d| d.starts_with("role: "))),
+        body["message"]
+            .as_str()
+            .is_some_and(|m| m.contains("Validation error on Query") && m.contains("role")),
         "{body}"
     );
 

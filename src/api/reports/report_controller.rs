@@ -8,9 +8,7 @@ use axum::response::Response;
 use crate::api::reports::report_dto::{CreateReportDto, ReportResponse, UpdateReportDto};
 use crate::api::reports::report_service::ReportService;
 use crate::errors::{AppResult, BadRequestResponse, ErrorResponse};
-use crate::framework::{
-    CurrentUser, PaginationQuery, ValidatedJson, ValidatedQuery, ValidationErrorResponse, route,
-};
+use crate::framework::{CurrentUser, PaginationQuery, ValidatedJson, ValidatedQuery, route};
 
 // Route table and OpenAPI spec of the reports, defined point-inline: every
 // handler is annotated with `#[utoipa::path(...)]` (HTTP method, path and
@@ -28,7 +26,7 @@ use crate::framework::{
     ),
     responses(
         (status = 200, description = "Paginated list of reports; the total number of elements is returned in the `X-TOTAL-LIST` header", body = [ReportResponse], headers(("X-TOTAL-LIST" = u64, description = "Total number of reports across every page"))),
-        (status = 422, description = "Invalid pagination parameters", body = ValidationErrorResponse),
+        (status = 422, description = "Invalid pagination parameters", body = ErrorResponse),
         (status = 503, description = "Database unavailable", body = ErrorResponse),
     ),
 )]
@@ -50,7 +48,7 @@ pub async fn list_reports(
         (status = 201, description = "Report created successfully", body = ReportResponse),
         (status = 400, description = "Invalid request: malformed JSON body or non-existent category", body = BadRequestResponse),
         (status = 401, description = "Missing or invalid access token", body = ErrorResponse),
-        (status = 422, description = "Field validation failed", body = ValidationErrorResponse),
+        (status = 422, description = "Field validation failed", body = ErrorResponse),
         (status = 503, description = "Database unavailable", body = ErrorResponse),
     ),
     security(
@@ -98,7 +96,7 @@ pub async fn get_report(
         (status = 400, description = "Invalid request: malformed JSON body or non-existent category", body = BadRequestResponse),
         (status = 401, description = "Missing or invalid access token", body = ErrorResponse),
         (status = 404, description = "Report not found", body = ErrorResponse),
-        (status = 422, description = "Field validation failed", body = ValidationErrorResponse),
+        (status = 422, description = "Field validation failed", body = ErrorResponse),
         (status = 503, description = "Database unavailable", body = ErrorResponse),
     ),
     security(

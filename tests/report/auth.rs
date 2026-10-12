@@ -144,10 +144,11 @@ async fn register_rejects_invalid_email() {
     .await;
 
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{body}");
-    let details = body["details"].as_array().expect("details come lista");
+    assert_eq!(body["code"], "validation_error", "{body}");
+    assert_eq!(body["error"], "422 Unprocessable Entity", "{body}");
     assert!(
-        details.iter().any(|d| d.to_string().contains("email")),
-        "{details:?}"
+        body["message"].as_str().unwrap().contains("email"),
+        "{body}"
     );
 }
 
@@ -158,10 +159,11 @@ async fn register_rejects_short_password() {
     let (status, body) = register(&app, "short@example.com", "abc").await;
 
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{body}");
-    let details = body["details"].as_array().expect("details come lista");
+    assert_eq!(body["code"], "validation_error", "{body}");
+    assert_eq!(body["error"], "422 Unprocessable Entity", "{body}");
     assert!(
-        details.iter().any(|d| d.to_string().contains("password")),
-        "{details:?}"
+        body["message"].as_str().unwrap().contains("password"),
+        "{body}"
     );
 }
 

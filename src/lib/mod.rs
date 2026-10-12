@@ -12,9 +12,7 @@ pub mod registry;
 pub mod validators;
 
 pub use auth::{CurrentUser, JwtConfig};
-pub use middlewares::validation_middleware::{
-    ValidatedJson, ValidatedParams, ValidatedQuery, ValidationErrorResponse,
-};
+pub use middlewares::validation_middleware::{ValidatedJson, ValidatedParams, ValidatedQuery};
 pub use pagination::{Paged, Pagination, PaginationQuery, TOTAL_HEADER};
 pub use validator::Validate;
 pub use validators::{format_validation_errors, not_blank};

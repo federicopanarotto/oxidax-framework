@@ -128,12 +128,9 @@ async fn place_rejects_blank_city() {
 
     assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
     let body = json_body(response).await;
-    assert_eq!(body["error"], "Validation error on Body");
-    let details = body["details"].as_array().expect("details come lista");
-    assert!(
-        details.iter().any(|d| d.as_str().unwrap().contains("city")),
-        "{details:?}"
-    );
+    assert_eq!(body["code"], "validation_error", "{body}");
+    assert_eq!(body["error"], "422 Unprocessable Entity", "{body}");
+    assert!(body["message"].as_str().unwrap().contains("city"), "{body}");
 }
 
 #[tokio::test]

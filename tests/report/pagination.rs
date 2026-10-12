@@ -82,10 +82,26 @@ async fn list_rejects_invalid_pagination() {
     ] {
         let (status, body, _) = get(&app, uri).await;
         assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{uri}: {body}");
-        assert_eq!(body["error"], "Validation error on Query", "{body}");
+        assert_eq!(body["code"], "validation_error", "{uri}: {body}");
+        assert_eq!(body["error"], "422 Unprocessable Entity", "{uri}: {body}");
+        assert!(
+            body["message"]
+                .as_str()
+                .unwrap()
+                .contains("Validation error on Query"),
+            "{uri}: {body}"
+        );
     }
 
     // A non-numeric value is a malformed query (400), not a validation error.
     let (status, body, _) = get(&app, "/api/categories?page=abc").await;
     assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
+    assert_eq!(body["code"], "bad_request", "{body}");
+    assert!(
+        body["message"]
+            .as_str()
+            .unwrap()
+            .contains("Query parameters are invalid"),
+        "{body}"
+    );
 }

@@ -281,7 +281,9 @@ Punti chiave:
 
 - `#[derive(Validate)]` + `#[validate(...)]` sono ciò che l'estrattore
   `ValidatedJson` esegue **prima** che l'handler venga chiamato: se falliscono,
-  risponde `422 {error, details}` senza mai entrare nel service.
+  risponde `422 {code: validation_error, error, message}` senza mai entrare nel
+  service (stesso formato `{code, error, message}` della pipeline: body/query/
+  params malformati danno `400 {code: bad_request}`).
 - `not_blank` è un validator condiviso (`crate::lib::validators`): rifiuta
   stringhe vuote o fatte solo di spazi.
 - `into_entity` normalizza (`.trim()`) e genera l'`id`: così il service riceve
@@ -596,7 +598,7 @@ use axum::http::StatusCode;
 use crate::api::places::place_dto::{CreatePlaceDto, PlaceResponse, UpdatePlaceDto};
 use crate::api::places::place_service::PlaceService;
 use crate::errors::{AppResult, BadRequestResponse, ErrorResponse};
-use crate::framework::{ValidatedJson, ValidationErrorResponse, route};
+use crate::framework::{ValidatedJson, route};
 
 // Route table and OpenAPI spec of the places, defined point-inline: every
 // handler is annotated with `#[utoipa::path(...)]` (HTTP method, path and
@@ -628,7 +630,7 @@ pub async fn list_places(
     responses(
         (status = 201, description = "Place created successfully", body = PlaceResponse),
         (status = 400, description = "Invalid request: malformed JSON body", body = BadRequestResponse),
-        (status = 422, description = "Field validation failed", body = ValidationErrorResponse),
+        (status = 422, description = "Field validation failed", body = ErrorResponse),
         (status = 503, description = "Database unavailable", body = ErrorResponse),
     ),
 )]
@@ -670,7 +672,7 @@ pub async fn get_place(
         (status = 200, description = "Place updated", body = PlaceResponse),
         (status = 400, description = "Invalid request: malformed JSON body", body = BadRequestResponse),
         (status = 404, description = "Place not found", body = ErrorResponse),
-        (status = 422, description = "Field validation failed", body = ValidationErrorResponse),
+        (status = 422, description = "Field validation failed", body = ErrorResponse),
         (status = 503, description = "Database unavailable", body = ErrorResponse),
     ),
 )]
@@ -840,7 +842,7 @@ Lato **controller** aggiungi l'estrattore `PaginationQuery` e chiama
         (status = 200, description = "Lista paginata; totale in `X-TOTAL-LIST`",
             body = [PlaceResponse],
             headers(("X-TOTAL-LIST" = u64, description = "Totale elementi su tutte le pagine"))),
-        (status = 422, description = "Parametri di paginazione non validi", body = ValidationErrorResponse),
+        (status = 422, description = "Parametri di paginazione non validi", body = ErrorResponse),
         (status = 503, description = "Database unavailable", body = ErrorResponse),
     ),
 )]

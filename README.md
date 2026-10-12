@@ -140,11 +140,12 @@ e `role`: anche l'auth resta zero-touch, senza layer globali da configurare.
 ## Contratto delle risposte
 
 - **Successo**: corpo JSON del DTO di risposta (o `204`).
-- **Errore di dominio/pipeline**: sempre `{code, error, message}` con status
-  HTTP significativo (`not_found`, `database_unavailable`, ...).
-- **Errore di validazione**: sempre `{error, details}` con `422`; body/query
-  malformati danno `400`. Il campo `details` elenca i problemi campo per campo,
-  formato "Gentile e professionale" pensato anche per l'utente finale.
+- **Errore**: sempre `{code, error, message}` con status HTTP significativo
+  (`not_found`, `database_unavailable`, ...). Vale per dominio, pipeline e
+  validazione DTO: per quest'ultima `code` è `validation_error` (campo non
+  valido, `422`) oppure `bad_request` (body/query/params malformati, `400`);
+  i problemi campo per campo sono elencati in `message`, formato "Gentile e
+  professionale" pensato anche per l'utente finale.
 
 ## Paginazione
 
@@ -169,8 +170,9 @@ X-TOTAL-LIST: 42
 [ { "id": "...", "name": "Vendita" }, ... ]
 ```
 
-I valori fuori range danno `422 {error, details}` (come ogni DTO validato); un
-valore non numerico dà `400`. Tutto è riutilizzabile: il DTO
+I valori fuori range danno `422 {code: validation_error}` (come ogni DTO
+validato); un valore non numerico dà `400 {code: bad_request}`. Tutto è
+riutilizzabile: il DTO
 `PaginationQuery`, il value object `Pagination` e il payload `Paged<T>` vivono
 in `src/lib/pagination.rs` e gli helper di query (count + pagina) in
 `src/db/query.rs`. Una feature paginata aggiunge solo un estrattore e fa
@@ -273,8 +275,11 @@ cargo fmt --check
 
 - [x] Routing + DI + OpenAPI con discovery **zero-touch** (`#[route]` su ogni
       handler, registri `inventory`)
-- [x] Validazione decorator su body/query/params con errori `422 {error, details}`
+- [x] Validazione decorator su body/query/params con errori `422 {code: validation_error}`
 - [x] Pipeline errori uniforme + fallback 404
+- [x] Errori **tutti** nello stesso formato `{code, error, message}`: dominio,
+      pipeline e validazione DTO condividono il body (`ErrorResponse`,
+      `bad_request` per body/query/params malformati)
 - [x] Feature di esempio: `categories`, `reports` e `places` su SurrealDB
       (`mem://` nei test)
 - [x] Swagger UI live
@@ -288,7 +293,20 @@ cargo fmt --check
 - [x] Paginazione riutilizzabile su tutte le liste: `?page=&limit=` validati,
       array nel body e totale in `X-TOTAL-LIST` (`Paged<T>` +
       `src/db/query.rs`); `422` fuori range
-- [ ] Ordinamento (`?sort=`) e ricerca/filtri condivisi tra le feature
+### Backlog (da sviluppare)
+
+Feature non ancora implementate, in ordine di priorità approssimativo. Le prime
+sono "di base" per rendere il framework completo; l'ordinamento è **non
+essenziale** al momento:
+
+- [ ] Request ID + tracing per richiesta (correlation id nei log/header)
+- [ ] Migrazioni/schema versioning + indici per i campi filtrati
+- [ ] Rate limiting, CORS e security headers come middleware estraibili
+- [ ] Health con readiness (ping DB) + metriche + graceful shutdown
+- [ ] Timestamps `created_at`/`updated_at` e soft delete riusabili
+- [ ] `?sort=` (ordinamento) — **non essenziale**: prefisso `-` per desc o
+      param separato `order=asc|desc`, con whitelist campi per entità
+- [ ] Ricerca/filtri generici condivisi tra le feature
 
 > **Nota**: il framework è in costruzione e serve a imparare: l'API pubblica
 > delle macro e la struttura dei registri possono cambiare.

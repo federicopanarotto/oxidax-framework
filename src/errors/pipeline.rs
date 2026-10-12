@@ -16,11 +16,7 @@ use super::response::ErrorResponse;
 /// Converts an [`AppError`] into the final HTTP response.
 pub fn respond(error: AppError) -> Response {
     let status = error.status();
-    let body = ErrorResponse {
-        code: error.code().to_string(),
-        error: status.to_string(),
-        message: error.to_string(),
-    };
+    let body = ErrorResponse::new(error.code(), status, error.to_string());
 
     if status.is_server_error() {
         error!(

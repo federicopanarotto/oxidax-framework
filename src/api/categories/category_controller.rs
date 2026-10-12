@@ -10,9 +10,7 @@ use crate::api::categories::category_dto::{
 };
 use crate::api::categories::category_service::CategoryService;
 use crate::errors::{AppResult, BadRequestResponse, ErrorResponse};
-use crate::framework::{
-    PaginationQuery, ValidatedJson, ValidatedQuery, ValidationErrorResponse, route,
-};
+use crate::framework::{PaginationQuery, ValidatedJson, ValidatedQuery, route};
 
 // Route table and OpenAPI spec of the categories, defined point-inline: every
 // handler is annotated with `#[utoipa::path(...)]` (HTTP method, path and
@@ -30,7 +28,7 @@ use crate::framework::{
     ),
     responses(
         (status = 200, description = "Paginated list of categories; the total number of elements is returned in the `X-TOTAL-LIST` header", body = [CategoryResponse], headers(("X-TOTAL-LIST" = u64, description = "Total number of categories across every page"))),
-        (status = 422, description = "Invalid pagination parameters", body = ValidationErrorResponse),
+        (status = 422, description = "Invalid pagination parameters", body = ErrorResponse),
         (status = 503, description = "Database unavailable", body = ErrorResponse),
     ),
 )]
@@ -51,7 +49,7 @@ pub async fn list_categories(
     responses(
         (status = 201, description = "Category created successfully", body = CategoryResponse),
         (status = 400, description = "Invalid request: malformed JSON body", body = BadRequestResponse),
-        (status = 422, description = "Field validation failed", body = ValidationErrorResponse),
+        (status = 422, description = "Field validation failed", body = ErrorResponse),
         (status = 503, description = "Database unavailable", body = ErrorResponse),
     ),
 )]
@@ -93,7 +91,7 @@ pub async fn get_category(
         (status = 200, description = "Category updated", body = CategoryResponse),
         (status = 400, description = "Invalid request: malformed JSON body", body = BadRequestResponse),
         (status = 404, description = "Category not found", body = ErrorResponse),
-        (status = 422, description = "Field validation failed", body = ValidationErrorResponse),
+        (status = 422, description = "Field validation failed", body = ErrorResponse),
         (status = 503, description = "Database unavailable", body = ErrorResponse),
     ),
 )]

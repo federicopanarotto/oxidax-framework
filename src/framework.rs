@@ -12,7 +12,7 @@
 pub use crate::errors::{AppError, AppResult, BadRequestResponse, ErrorResponse};
 pub use crate::lib::auth::CurrentUser;
 pub use crate::lib::middlewares::validation_middleware::{
-    ValidatedJson, ValidatedParams, ValidatedQuery, ValidationErrorResponse,
+    ValidatedJson, ValidatedParams, ValidatedQuery,
 };
 pub use crate::lib::pagination::{Paged, Pagination, PaginationQuery, TOTAL_HEADER};
 pub use crate::lib::registry::{Feature, Route, register_repository};

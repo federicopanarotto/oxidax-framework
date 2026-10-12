@@ -167,12 +167,9 @@ async fn create_without_name_returns_422() {
 
     assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
     let body = json_body(response).await;
-    assert_eq!(body["error"], "Validation error on Body");
-    let details = body["details"].as_array().expect("details come lista");
-    assert!(
-        details.iter().any(|d| d.as_str().unwrap().contains("name")),
-        "{details:?}"
-    );
+    assert_eq!(body["code"], "validation_error", "{body}");
+    assert_eq!(body["error"], "422 Unprocessable Entity", "{body}");
+    assert!(body["message"].as_str().unwrap().contains("name"), "{body}");
 }
 
 #[tokio::test]
@@ -195,9 +192,15 @@ async fn malformed_json_returns_400_with_details() {
 
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     let body = json_body(response).await;
-    assert_eq!(body["error"], "Body JSON is invalid or malformed");
-    let details = body["details"].as_array().expect("details come lista");
-    assert!(!details.is_empty());
+    assert_eq!(body["code"], "bad_request", "{body}");
+    assert_eq!(body["error"], "400 Bad Request", "{body}");
+    assert!(
+        body["message"]
+            .as_str()
+            .unwrap()
+            .contains("Body JSON is invalid or malformed"),
+        "{body}"
+    );
 }
 
 #[tokio::test]

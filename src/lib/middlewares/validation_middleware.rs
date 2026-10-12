@@ -2,32 +2,25 @@
 //!
 //! Each extractor deserializes the DTO and validates it with the
 //! `#[validate(...)]` decorators of the `validator` crate, rejecting the
-//! request with a uniform JSON body before the controller is called:
+//! request before the controller is called. The error body is the same
+//! [`ErrorResponse`] shape used by the rest of the API
+//! (`{code, error, message}`):
 //!
-//! - malformed/unparsable JSON: `400 Bad Request`;
-//! - invalid fields: `422 Unprocessable Entity` with per-field details.
+//! - malformed/unparsable body/query/params: `400 Bad Request`, code
+//!   `bad_request`;
+//! - invalid fields: `422 Unprocessable Entity`, code `validation_error`, with
+//!   the per-field details joined into `message`.
 
 use axum::Json;
 use axum::extract::{FromRequest, FromRequestParts, Path, Query, Request};
 use axum::http::StatusCode;
 use axum::http::request::Parts;
 use axum::response::{IntoResponse, Response};
-use serde::Serialize;
 use serde::de::DeserializeOwned;
-use utoipa::ToSchema;
 use validator::Validate;
 
+use crate::errors::ErrorResponse;
 use crate::lib::validators::format_validation_errors;
-
-/// Uniform JSON body of the extractors' validation errors.
-#[derive(Debug, Serialize, ToSchema)]
-pub struct ValidationErrorResponse {
-    /// Description of the error (body/query/params)
-    #[schema(example = "Validation error on body")]
-    pub error: String,
-    /// Details for each field (`field: message`)
-    pub details: Vec<String>,
-}
 
 /// Validated DTO coming from the JSON body.
 pub struct ValidatedJson<T>(pub T);
@@ -49,8 +42,8 @@ where
         let Json(data) = Json::<T>::from_request(req, state).await.map_err(|err| {
             error_response(
                 StatusCode::BAD_REQUEST,
-                "Body JSON is invalid or malformed",
-                vec![err.to_string()],
+                "bad_request",
+                format!("Body JSON is invalid or malformed: {err}"),
             )
         })?;
 
@@ -75,8 +68,8 @@ where
             .map_err(|err| {
                 error_response(
                     StatusCode::BAD_REQUEST,
-                    "Query parameters are invalid",
-                    vec![err.to_string()],
+                    "bad_request",
+                    format!("Query parameters are invalid: {err}"),
                 )
             })?;
 
@@ -101,8 +94,8 @@ where
             .map_err(|err| {
                 error_response(
                     StatusCode::BAD_REQUEST,
-                    "Path parameters are invalid",
-                    vec![err.to_string()],
+                    "bad_request",
+                    format!("Path parameters are invalid: {err}"),
                 )
             })?;
 
@@ -115,20 +108,14 @@ where
 }
 
 fn validation_error_response(source: &str, errors: validator::ValidationErrors) -> Response {
+    let details = format_validation_errors(errors).join("; ");
     error_response(
         StatusCode::UNPROCESSABLE_ENTITY,
-        format!("Validation error on {source}"),
-        format_validation_errors(errors),
+        "validation_error",
+        format!("Validation error on {source}: {details}"),
     )
 }
 
-fn error_response(status: StatusCode, error: impl Into<String>, details: Vec<String>) -> Response {
-    (
-        status,
-        Json(ValidationErrorResponse {
-            error: error.into(),
-            details,
-        }),
-    )
-        .into_response()
+fn error_response(status: StatusCode, code: &str, message: impl Into<String>) -> Response {
+    (status, Json(ErrorResponse::new(code, status, message))).into_response()
 }

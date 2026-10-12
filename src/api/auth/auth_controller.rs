@@ -9,7 +9,7 @@ use crate::api::auth::auth_dto::{
 };
 use crate::api::auth::auth_service::AuthService;
 use crate::errors::{AppResult, BadRequestResponse, ErrorResponse};
-use crate::framework::{CurrentUser, ValidatedJson, ValidationErrorResponse, route};
+use crate::framework::{CurrentUser, ValidatedJson, route};
 
 // Route table and OpenAPI spec of the authentication, defined point-inline:
 // every handler is annotated with `#[utoipa::path(...)]`, `#[IsGranted]`
@@ -28,7 +28,7 @@ use crate::framework::{CurrentUser, ValidatedJson, ValidationErrorResponse, rout
         (status = 201, description = "User registered successfully", body = MessageResponse),
         (status = 400, description = "Invalid request: malformed JSON body", body = BadRequestResponse),
         (status = 409, description = "Registration could not be completed", body = ErrorResponse),
-        (status = 422, description = "Field validation failed", body = ValidationErrorResponse),
+        (status = 422, description = "Field validation failed", body = ErrorResponse),
         (status = 503, description = "Database unavailable", body = ErrorResponse),
     ),
 )]
@@ -50,7 +50,7 @@ pub async fn register(
         (status = 200, description = "Tokens issued", body = TokenResponse),
         (status = 400, description = "Invalid request: malformed JSON body", body = BadRequestResponse),
         (status = 401, description = "Invalid credentials (wrong email or wrong password)", body = ErrorResponse),
-        (status = 422, description = "Field validation failed", body = ValidationErrorResponse),
+        (status = 422, description = "Field validation failed", body = ErrorResponse),
         (status = 503, description = "Database unavailable", body = ErrorResponse),
     ),
 )]
@@ -71,7 +71,7 @@ pub async fn login(
         (status = 200, description = "New token pair issued; the previous refresh token is no longer valid", body = TokenResponse),
         (status = 400, description = "Invalid request: malformed JSON body", body = BadRequestResponse),
         (status = 401, description = "Invalid, expired or already used refresh token", body = ErrorResponse),
-        (status = 422, description = "Field validation failed", body = ValidationErrorResponse),
+        (status = 422, description = "Field validation failed", body = ErrorResponse),
         (status = 503, description = "Database unavailable", body = ErrorResponse),
     ),
     security(

@@ -2,9 +2,8 @@
 //!
 //! Pipeline: every application error is normalized into [`AppError`] (machine
 //! code + HTTP status), then [`pipeline::respond`] turns it into the uniform
-//! JSON response with structured logging. DTO validation errors, on the other
-//! hand, are handled by the extractors in `crate::lib` with the `{error,
-//! details}` shape.
+//! JSON response with structured logging. DTO validation errors handled by
+//! the extractors in `crate::lib` share the same [`ErrorResponse`] body.
 
 pub mod pipeline;
 pub mod response;
@@ -12,27 +11,20 @@ pub mod response;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use utoipa::openapi::RefOr;
-use utoipa::openapi::schema::{OneOfBuilder, Ref, Schema};
+use utoipa::openapi::schema::{Ref, Schema};
 use utoipa::{PartialSchema, ToSchema};
 
 pub use response::ErrorResponse;
 
-/// Body of the `400 Bad Request` responses of the write methods: it can be
-/// the rejection of the validation extractors for malformed body/query
-/// ([`ValidationErrorResponse`], `{error, details}` shape) or a domain error
-/// such as a missing category ([`ErrorResponse`], `{code, error, message}`
-/// shape).
-///
-/// It is a plain OpenAPI alias: it does not exist at runtime, it only
-/// documents that the 400 can return one of the two bodies (`oneOf` schema).
+/// OpenAPI alias of the `400 Bad Request` responses of the write methods:
+/// whatever the source (malformed body/query from the validation extractors or
+/// an application error such as a missing category), the body has the same
+/// [`ErrorResponse`] shape. It exists only for documentation, not at runtime.
 pub struct BadRequestResponse {}
 
 impl PartialSchema for BadRequestResponse {
     fn schema() -> RefOr<Schema> {
-        OneOfBuilder::new()
-            .item(Ref::from_schema_name("ErrorResponse"))
-            .item(Ref::from_schema_name("ValidationErrorResponse"))
-            .into()
+        Ref::from_schema_name("ErrorResponse").into()
     }
 }
 

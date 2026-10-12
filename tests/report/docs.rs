@@ -55,7 +55,6 @@ async fn swagger_and_health_are_available() {
     assert!(schemas.contains_key("ErrorResponse"));
     assert!(schemas.contains_key("ReportResponse"));
     assert!(schemas.contains_key("CategoryResponse"));
-    assert!(schemas.contains_key("ValidationErrorResponse"));
 
     let create_report = &spec["paths"]["/api/reports"]["post"];
     assert!(
@@ -64,6 +63,6 @@ async fn swagger_and_health_are_available() {
     );
     assert_eq!(
         create_report["responses"]["422"]["content"]["application/json"]["schema"]["$ref"],
-        "#/components/schemas/ValidationErrorResponse"
+        "#/components/schemas/ErrorResponse"
     );
 }
