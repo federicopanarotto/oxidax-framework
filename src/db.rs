@@ -20,6 +20,8 @@ use crate::api::places::place_repository::PlaceRepository;
 use crate::api::places::surreal_place_repository::SurrealPlaceRepository;
 use crate::api::reports::report_repository::ReportRepository;
 use crate::api::reports::surreal_report_repository::SurrealReportRepository;
+use crate::api::uploads::surreal_upload_repository::SurrealAssetRepository;
+use crate::api::uploads::upload_repository::AssetRepository;
 use crate::api::users::surreal_user_repository::SurrealUserRepository;
 use crate::api::users::user_repository::UserRepository;
 use crate::config::{Config, DbBackend};
@@ -38,6 +40,7 @@ pub struct Repositories {
     pub color: Arc<dyn ColorRepository>,
     pub users: Arc<dyn UserRepository>,
     pub user_identities: Arc<dyn UserIdentityRepository>,
+    pub assets: Arc<dyn AssetRepository>,
 }
 
 /// Creates the repositories based on the configured backend.
@@ -69,6 +72,7 @@ pub fn register_repositories(repositories: &Repositories, services: &mut Service
     register_repository(services, repositories.color.clone());
     register_repository(services, repositories.users.clone());
     register_repository(services, repositories.user_identities.clone());
+    register_repository(services, repositories.assets.clone());
 }
 
 async fn from_connection(db: Surreal<Any>) -> AppResult<Repositories> {
@@ -87,6 +91,9 @@ async fn from_connection(db: Surreal<Any>) -> AppResult<Repositories> {
     let users = SurrealUserRepository::new(db.clone());
     users.ensure_schema().await?;
 
+    let assets = SurrealAssetRepository::new(db.clone());
+    assets.ensure_schema().await?;
+
     let user_identities = SurrealUserIdentityRepository::new(db);
     user_identities.ensure_schema().await?;
 
@@ -97,5 +104,6 @@ async fn from_connection(db: Surreal<Any>) -> AppResult<Repositories> {
         color: Arc::new(color),
         users: Arc::new(users),
         user_identities: Arc::new(user_identities),
+        assets: Arc::new(assets),
     })
 }

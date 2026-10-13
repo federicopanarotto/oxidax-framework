@@ -12,4 +12,5 @@ mod pagination;
 mod places;
 mod service;
 mod support;
+mod upload;
 mod users;

@@ -47,6 +47,12 @@ pub enum AppError {
     Unauthorized(String),
     #[error("{0}")]
     Forbidden(String),
+    /// Request body too large (upload limits exceeded).
+    #[error("{0}")]
+    PayloadTooLarge(String),
+    /// Unsupported media type (e.g. a rejected file extension).
+    #[error("{0}")]
+    UnsupportedMediaType(String),
     #[error("{0}")]
     Database(String),
     #[error("{0}")]
@@ -64,6 +70,8 @@ impl AppError {
             Self::Conflict(_) => "conflict",
             Self::Unauthorized(_) => "unauthorized",
             Self::Forbidden(_) => "forbidden",
+            Self::PayloadTooLarge(_) => "payload_too_large",
+            Self::UnsupportedMediaType(_) => "unsupported_media_type",
             Self::Database(_) => "database_unavailable",
             Self::Internal(_) => "internal_error",
         }
@@ -77,6 +85,8 @@ impl AppError {
             Self::Conflict(_) => StatusCode::CONFLICT,
             Self::Unauthorized(_) => StatusCode::UNAUTHORIZED,
             Self::Forbidden(_) => StatusCode::FORBIDDEN,
+            Self::PayloadTooLarge(_) => StatusCode::PAYLOAD_TOO_LARGE,
+            Self::UnsupportedMediaType(_) => StatusCode::UNSUPPORTED_MEDIA_TYPE,
             Self::Database(_) => StatusCode::SERVICE_UNAVAILABLE,
             Self::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }

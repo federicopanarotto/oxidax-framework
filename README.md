@@ -238,6 +238,38 @@ account enumeration). The first admin is assigned directly in the database. In
 Swagger the two schemes `accessToken`/`refreshToken` (bearer JWT) are ready to
 use with "Authorize".
 
+## File uploads
+
+The framework ships a reusable, multer-style upload middleware in
+`oxidax-core/src/upload` (built on axum's `multipart`, i.e. `multer`):
+
+| Node.js / multer                       | Oxidax                                                     |
+| -------------------------------------- | ---------------------------------------------------------- |
+| `multer({ dest, limits, fileFilter })` | `UploadConfig`, installed by `app::assemble`               |
+| `upload.single('file')`                | `Upload::single("file")`                                   |
+| `upload.array('photos')`               | `Upload::array("photos")`                                  |
+| `req.file` / `req.files`               | `UploadedFile`                                             |
+| `req.body`                             | `Upload::field("name")`                                    |
+
+Files are streamed to disk (never buffered in memory) into `ASSETS_DIR`, under
+a random UUID name plus the original extension (configurable). The extractor
+`Upload` consumes the body, so it must be the **last** handler argument. Limits
+(per file, file count, body size) and the extension allow-list are enforced
+while streaming; violations return `413` / `415`.
+
+The application keeps a metadata table (`asset`) with the public id, owner,
+original name, content type, size and creation time. The public URL
+(`/api/upload/{id}`) is decoupled from the storage, so the files can later be
+moved to object storage without changing the API. Example endpoints
+(authenticated writes, public read):
+
+| Endpoint             | Effect                                                            |
+| -------------------- | ---------------------------------------------------------------- |
+| `GET /api/upload`    | paginated list of assets (`X-TOTAL-LIST`)                        |
+| `POST /api/upload`   | multipart `file` field → `201` with the asset metadata           |
+| `GET /api/upload/{id}` | streams the stored file with its content type and name        |
+| `DELETE /api/upload/{id}` | owner (or admin) deletes the row and the file → `204`       |
+
 ## Documentation
 
 The Swagger UI is served, live, at **`/swagger-ui`** (full spec at
@@ -257,7 +289,13 @@ cp .env.example .env   # template with all required variables
 Required variables: `SERVER_ADDR`, `DB_BACKEND` (`surreal` or `memory`),
 `SURREAL_URL`, `SURREAL_NS`, `SURREAL_DB`, `SURREAL_USER`, `SURREAL_PASS`,
 `JWT_SECRET`, `ACCESS_TOKEN_DURATION` (seconds), `REFRESH_TOKEN_DURATION`
-(seconds). If a variable is missing, startup fails with an explicit message.
+(seconds), `ASSETS_DIR` (root directory of the uploaded files, created at
+startup). If a variable is missing, startup fails with an explicit message.
+
+Optional upload variables: `UPLOAD_MAX_FILE_SIZE` (bytes, default 10 MiB),
+`UPLOAD_MAX_FILES` (default 10), `UPLOAD_MAX_BODY_SIZE` (bytes, default
+`UPLOAD_MAX_FILE_SIZE × UPLOAD_MAX_FILES`) and `UPLOAD_ALLOWED_EXTENSIONS`
+(comma-separated allow-list without the dot; empty = any extension).
 
 ### CORS
 
@@ -353,6 +391,8 @@ cargo fmt --all --check
 - [x] Interactive feature generator: `cargo xtask new-feature`
 - [x] CORS with a configurable regex origin allow-list (`CORS_ALLOWED_ORIGINS`),
       preflight support and `X-TOTAL-LIST` exposed
+- [x] Multer-style file upload middleware (`ASSETS_DIR`, streaming, limits,
+      extension filter) with a metadata table and upload/list/download/delete API
 
 ### Backlog (to be developed)
 

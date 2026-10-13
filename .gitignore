@@ -1,3 +1,5 @@
 /target
 .env
 docker/*.tar
+# Uploaded files (local development).
+/assets

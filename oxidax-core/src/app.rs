@@ -8,7 +8,9 @@
 
 use std::sync::Arc;
 
+use axum::Extension;
 use axum::Router;
+use axum::extract::DefaultBodyLimit;
 use axum::middleware::from_fn;
 use axum::routing::get;
 use di::ServiceCollection;
@@ -22,6 +24,7 @@ use crate::docs;
 use crate::errors::{AppError, AppResult, pipeline};
 use crate::middlewares::access_log::access_log;
 use crate::registry::{Feature, Route};
+use crate::upload::{UploadConfig, Uploader};
 
 /// Metadata of the generated OpenAPI document.
 #[derive(Debug, Clone, Copy)]
@@ -56,6 +59,22 @@ pub fn assemble(
         move |_| -> di::Ref<Config> { Arc::new(owned.clone()) },
     ));
 
+    // Upload middleware ("multer"): the storage directory is created at startup
+    // and the uploader is registered both in the DI container (so services can
+    // resolve it, e.g. to read/delete files) and as an axum layer (so the
+    // `Upload` extractor finds it on the request).
+    std::fs::create_dir_all(&config.assets_dir).map_err(|err| {
+        AppError::Internal(format!(
+            "failed to create assets directory `{}`: {err}",
+            config.assets_dir.display()
+        ))
+    })?;
+    let uploader = Arc::new(Uploader::new(UploadConfig::from(config)));
+    services.add(singleton_factory::<Uploader, _>({
+        let uploader = uploader.clone();
+        move |_| -> di::Ref<Uploader> { uploader.clone() }
+    }));
+
     register_repositories(&mut services);
 
     for feature in registered() {
@@ -74,8 +93,15 @@ pub fn assemble(
     }
     router = router.merge(docs::swagger_router(api));
 
+    // The upload middleware and the body-size limit wrap the routes: the
+    // `Upload` extractor resolves the shared `Uploader` from the request
+    // extensions set here, and the limit (from `UPLOAD_MAX_BODY_SIZE`) is what
+    // axum applies while streaming the multipart body.
+    let body_limit = usize::try_from(config.upload_max_body_size).unwrap_or(usize::MAX);
     let router = router
         .fallback(pipeline::route_not_found)
+        .layer(DefaultBodyLimit::max(body_limit))
+        .layer(Extension(uploader))
         .layer(from_fn(access_log));
 
     // CORS sits outermost so preflight (`OPTIONS`) requests are answered before

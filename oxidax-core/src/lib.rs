@@ -18,6 +18,7 @@ pub mod framework;
 pub mod middlewares;
 pub mod pagination;
 pub mod registry;
+pub mod upload;
 pub mod validators;
 
 /// Re-export of the validation derive used by the DTOs

@@ -16,4 +16,5 @@ pub use crate::middlewares::validation_middleware::{
 };
 pub use crate::pagination::{Paged, Pagination, PaginationQuery, TOTAL_HEADER};
 pub use crate::registry::{Feature, Route, register_repository};
+pub use crate::upload::{Upload, UploadConfig, UploadedFile, Uploader};
 pub use oxidax_macro::route;

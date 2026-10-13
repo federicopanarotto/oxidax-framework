@@ -1,6 +1,12 @@
 use std::env;
+use std::path::PathBuf;
 
 use regex::Regex;
+
+/// Default per-file upload limit: 10 MiB.
+const DEFAULT_UPLOAD_MAX_FILE_SIZE: u64 = 10 * 1024 * 1024;
+/// Default maximum number of files accepted in a single request.
+const DEFAULT_UPLOAD_MAX_FILES: usize = 10;
 
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -20,6 +26,17 @@ pub struct Config {
     /// Regex allow-list matched against the CORS `Origin` header. An empty list
     /// disables CORS entirely (no cross-origin requests allowed).
     pub cors_allowed_origins: Vec<Regex>,
+    /// Root directory where uploaded files are stored (`ASSETS_DIR`).
+    pub assets_dir: PathBuf,
+    /// Maximum size, in bytes, of a single uploaded file.
+    pub upload_max_file_size: u64,
+    /// Maximum number of files accepted in a single multipart request.
+    pub upload_max_files: usize,
+    /// Maximum size, in bytes, of the whole multipart request body.
+    pub upload_max_body_size: u64,
+    /// Optional allow-list of file extensions (without the dot). When empty,
+    /// every extension is accepted.
+    pub upload_allowed_extensions: Vec<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -60,8 +77,52 @@ impl Config {
             access_token_duration: required_duration("ACCESS_TOKEN_DURATION"),
             refresh_token_duration: required_duration("REFRESH_TOKEN_DURATION"),
             cors_allowed_origins: optional_regex_list("CORS_ALLOWED_ORIGINS"),
+            assets_dir: PathBuf::from(required("ASSETS_DIR")),
+            upload_max_file_size: optional_parsed(
+                "UPLOAD_MAX_FILE_SIZE",
+                DEFAULT_UPLOAD_MAX_FILE_SIZE,
+            ),
+            upload_max_files: optional_parsed("UPLOAD_MAX_FILES", DEFAULT_UPLOAD_MAX_FILES),
+            upload_max_body_size: optional_parsed(
+                "UPLOAD_MAX_BODY_SIZE",
+                DEFAULT_UPLOAD_MAX_FILE_SIZE * DEFAULT_UPLOAD_MAX_FILES as u64,
+            ),
+            upload_allowed_extensions: optional_list("UPLOAD_ALLOWED_EXTENSIONS"),
         }
     }
+}
+
+/// Reads an optional environment variable, returning `None` when unset or
+/// empty.
+fn optional(key: &str) -> Option<String> {
+    env::var(key).ok().filter(|value| !value.trim().is_empty())
+}
+
+/// Reads an optional numeric variable, falling back to `default` when unset.
+/// A present but unparsable value is a configuration error and panics.
+fn optional_parsed<T>(key: &str, default: T) -> T
+where
+    T: std::str::FromStr,
+{
+    match optional(key) {
+        Some(raw) => raw
+            .parse()
+            .unwrap_or_else(|_| panic!("environment variable `{key}` must be a valid number")),
+        None => default,
+    }
+}
+
+/// Reads an optional comma-separated list of values (e.g. file extensions).
+fn optional_list(key: &str) -> Vec<String> {
+    optional(key)
+        .map(|raw| {
+            raw.split(',')
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(str::to_string)
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 /// Reads an optional comma-separated list of regex patterns (CORS origins).

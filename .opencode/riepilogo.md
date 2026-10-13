@@ -46,6 +46,7 @@ keeps using `crate::lib::...`, `crate::framework::...`, `crate::errors::...`,
 | Auth           | `jsonwebtoken 11` (HS256) + `argon2 0.5` (Argon2id)         |
 | Errors         | `thiserror 2` + unified pipeline                           |
 | Log            | `tracing` + `tracing-subscriber`                           |
+| Upload         | axum `multipart` (i.e. `multer`) + `tokio` (fs/io-util) + `tokio-util` (ReaderStream) |
 | Config         | `dotenvy 0.15` + environment variables                     |
 
 The app dropped `utoipa-swagger-ui`, `jsonwebtoken`, `argon2` (they now live in
@@ -65,6 +66,7 @@ oxidax-core/src/
 ├── registry.rs        # static Feature (DI) and Route registries + register_repository
 ├── validators.rs      # format_validation_errors, not_blank, validate_uuid
 ├── pagination.rs      # PaginationQuery + Pagination + Paged<T> (X-TOTAL-LIST)
+├── upload/            # file upload middleware (multer-style): config, uploader, extractor
 ├── auth/              # auth core (order 0): jwt, password, user_identity,
 │                      #   identity_repository (trait + surreal), extractor, guard, mod
 ├── middlewares/
@@ -88,7 +90,8 @@ src/                     # the application
     ├── places/         # feature: city, address, cap, provenance
     ├── reports/        # feature (order 3): depends on categories, places and users
     ├── users/          # feature (order 2): /api/users/me, /api/users (admin)
-    └── auth/           # feature (order 4): register/login/refresh/logout
+    ├── auth/           # feature (order 4): register/login/refresh/logout
+    └── uploads/        # feature (order 5): /api/upload (asset table + local files)
 
 tests/report/           # end-to-end HTTP integration tests (mem:// backend)
 README.md               # English project overview
@@ -165,7 +168,8 @@ validation extractor's `ErrorResponse`.
 ### Error contract
 - Domain/pipeline: `{code, error, message}` with the right status
   (`not_found` 404, `validation_error` 400, `conflict` 409, `unauthorized` 401,
-  `forbidden` 403, `database_unavailable` 503, `internal_error` 500).
+  `forbidden` 403, `payload_too_large` 413, `unsupported_media_type` 415,
+  `database_unavailable` 503, `internal_error` 500).
 - Validation extractor: invalid fields → **422** code `validation_error` (details
   joined into `message`); malformed/unparsable body/query/params → **400** code
   `bad_request`. Same `ErrorResponse` shape as everything else.
@@ -200,14 +204,36 @@ validation extractor's `ErrorResponse`.
 - Allows methods `GET/POST/PUT/PATCH/DELETE/OPTIONS`, headers
   `Authorization`/`Content-Type`/`Accept`, and exposes `X-TOTAL-LIST`.
 
+### File uploads (multer-style)
+- `oxidax-core/src/upload/`: `config.rs` (`UploadConfig`, `FileNameStrategy`),
+  `uploader.rs` (`Uploader` + `UploadedFile`, streaming write, limits/extension
+  filter, `remove`), `extractor.rs` (`Upload`, must be the **last** handler arg,
+  consumes the body), `mod.rs` (`stream_file` for downloads + filename
+  sanitization). Built on axum `multipart` (i.e. `multer`).
+- `Uploader` is built in `app::assemble` from `UploadConfig::from(config)`,
+  **registered in DI** (services resolve it) and installed on the router as an
+  `axum::Extension` layer; the body limit uses `DefaultBodyLimit::max(
+  UPLOAD_MAX_BODY_SIZE)`. The assets dir is created at startup.
+- Files are streamed to disk (never buffered) under a random UUID name + the
+  original extension; `Upload::single/array/files` + `field` mirror
+  `upload.single/array/any` + `req.file(s)`/`req.body`.
+- App feature `uploads` (order 5): entity `Asset`, trait `AssetRepository` +
+  `SurrealAssetRepository` (table `asset`), `UploadService` (compensates the file
+  if the DB insert fails; delete = owner or admin), routes `GET/POST /api/upload`
+  and `GET/DELETE /api/upload/{id}` (writes require `#[IsGranted]`).
+
 ### Configuration
 - `Config::from_env()` loads `.env` (`dotenvy::dotenv().ok()`, existing env vars
   win) and reads **all** variables with **no default** (helper `required` →
   explicit panic if missing).
 - Variables: `SERVER_ADDR`, `DB_BACKEND` (`surreal` | `memory`), `SURREAL_URL`,
   `SURREAL_NS`, `SURREAL_DB`, `SURREAL_USER`, `SURREAL_PASS`, `JWT_SECRET`,
-  `ACCESS_TOKEN_DURATION` (900), `REFRESH_TOKEN_DURATION` (604800). Optional:
-  `CORS_ALLOWED_ORIGINS` (comma-separated regex allow-list; empty = CORS off).
+  `ACCESS_TOKEN_DURATION` (900), `REFRESH_TOKEN_DURATION` (604800), `ASSETS_DIR`
+  (required: root directory of the uploaded files). Optional:
+  `CORS_ALLOWED_ORIGINS` (comma-separated regex allow-list; empty = CORS off),
+  `UPLOAD_MAX_FILE_SIZE` (10 MiB), `UPLOAD_MAX_FILES` (10),
+  `UPLOAD_MAX_BODY_SIZE` (default = file-size × max-files), and
+  `UPLOAD_ALLOWED_EXTENSIONS` (comma-separated, no dot; empty = any).
 - `.env` is git-ignored; `.env.example` is the template. `main.rs` loads dotenv
   **before** setting up tracing (so `RUST_LOG` from the file applies).
 - `Config::memory()` uses the memory backend (tests) but still reads the rest from
@@ -223,6 +249,7 @@ validation extractor's `ErrorResponse`.
 | users       | 2     | `user`          | `GET /api/users/me`; `GET /api/users?role=` (admin only)     |
 | reports     | 3     | `report`        | CRUD `/api/reports`; creator + relations to categories/places |
 | auth        | 4     | —               | register/login/refresh/logout (`/api/auth/*`)                |
+| uploads     | 5     | `asset`         | upload/download/delete files (`/api/upload`)                 |
 
 - `Report` (entity) has `category_id: Option<String>`, `place_id: Option<String>`
   and `user_id: Option<String>` (creator; `None` only on legacy rows).
@@ -273,13 +300,17 @@ validation extractor's `ErrorResponse`.
    single-use refresh.
 10. Query params: `XxxQueryDto` + `ValidatedQuery<...>`; allowed values validated
     with a custom validator (module-local when domain-bound).
+11. Uploads: the `Upload` extractor must be the **last** handler argument (it
+    consumes the body); the core only writes files, the feature persists the
+    metadata (`Asset`) via its service/repository.
 
 ## Status and verification
 
-- **Tests**: 45 integration tests over real HTTP with the `mem://` backend —
-  `auth.rs` 13, `categories.rs` 5, `crud.rs` 5, `places.rs` 4, `service.rs` 4,
-  `cors.rs` 4, `creator.rs` 3, `users.rs` 3, `pagination.rs` 2, `color.rs` 1
-  (generated feature kept), `docs.rs` 1. `cargo test --workspace` → 45 passed.
+- **Tests**: 52 integration tests over real HTTP with the `mem://` backend —
+  `auth.rs` 13, `upload.rs` 7, `categories.rs` 5, `crud.rs` 5, `places.rs` 4,
+  `service.rs` 4, `cors.rs` 4, `creator.rs` 3, `users.rs` 3, `pagination.rs` 2,
+  `color.rs` 1 (generated feature kept), `docs.rs` 1.
+  `cargo test --workspace` → 52 passed.
 - `cargo check --workspace --all-targets`, `cargo clippy --workspace --all-targets
   -- -D warnings` and `cargo fmt --all` all clean.
 - The `new-feature` generator was verified end-to-end: it scaffolds a compiling

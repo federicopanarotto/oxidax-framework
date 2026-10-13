@@ -39,8 +39,12 @@ RUN apt-get update \
 
 COPY --from=builder /app/target/release/oxidax /usr/local/bin/oxidax
 
-# Non-root user with dedicated uid/gid.
-RUN useradd --uid 10001 --create-home app
+# Non-root user with dedicated uid/gid. The assets directory is created here
+# and owned by the app user, so a named volume mounted on it (compose) keeps
+# the same ownership and stays writable.
+RUN useradd --uid 10001 --create-home app \
+    && mkdir -p /data/assets \
+    && chown -R app:app /data
 USER app
 
 # Almost every value comes from the environment (see docker/prod/.env.example).

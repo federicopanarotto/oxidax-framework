@@ -23,7 +23,12 @@ services:
       - "${API_PUBLIC_PORT:-3000}:3000"
     depends_on:
       - surreal
+    # Uploaded files live on a named volume so they survive container restarts
+    # (ASSETS_DIR in .env points here).
+    volumes:
+      - assets-data:/data/assets
     restart: unless-stopped
 
 volumes:
   surreal-data:
+  assets-data:
