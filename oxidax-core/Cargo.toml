@@ -23,4 +23,6 @@ validator = { version = "0.21", features = ["derive"] }
 dotenvy = "0.15"
 jsonwebtoken = { version = "11", features = ["rust_crypto"] }
 argon2 = "0.5"
+regex = "1"
+tower-http = { version = "0.6", features = ["cors"] }
 oxidax-macro = { path = "../oxidax-macro" }

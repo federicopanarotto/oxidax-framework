@@ -259,6 +259,24 @@ Required variables: `SERVER_ADDR`, `DB_BACKEND` (`surreal` or `memory`),
 `JWT_SECRET`, `ACCESS_TOKEN_DURATION` (seconds), `REFRESH_TOKEN_DURATION`
 (seconds). If a variable is missing, startup fails with an explicit message.
 
+### CORS
+
+CORS is optional and configured with a single variable, `CORS_ALLOWED_ORIGINS`:
+a comma-separated list of **regex** patterns matched against the request's
+`Origin` header (scheme + host + port). A lone `*` allows any origin; an empty
+or unset variable disables CORS entirely (no CORS headers, cross-origin requests
+blocked by the browser).
+
+```bash
+# localhost on any port + any subdomain of example.com
+CORS_ALLOWED_ORIGINS=^http://localhost(:\d+)?$,^https://(.+\.)?example\.com$
+```
+
+The layer answers preflight (`OPTIONS`) requests, allows the methods
+`GET/POST/PUT/PATCH/DELETE/OPTIONS`, allows the `Authorization`, `Content-Type`
+and `Accept` headers, and exposes the pagination header `X-TOTAL-LIST` to
+browsers. An invalid regex fails fast at startup.
+
 ## Running
 
 ```bash
@@ -333,6 +351,8 @@ cargo fmt --all --check
 - [x] Workspace split into `oxidax-core` (reusable library), `oxidax-macro`
       (the `#[route]` macro) and `oxidax-cli` (Docker helpers + code generator)
 - [x] Interactive feature generator: `cargo xtask new-feature`
+- [x] CORS with a configurable regex origin allow-list (`CORS_ALLOWED_ORIGINS`),
+      preflight support and `X-TOTAL-LIST` exposed
 
 ### Backlog (to be developed)
 

@@ -1,5 +1,7 @@
 use std::env;
 
+use regex::Regex;
+
 #[derive(Debug, Clone)]
 pub struct Config {
     pub server_addr: String,
@@ -15,6 +17,9 @@ pub struct Config {
     pub access_token_duration: u64,
     /// Lifetime in seconds of a refresh token.
     pub refresh_token_duration: u64,
+    /// Regex allow-list matched against the CORS `Origin` header. An empty list
+    /// disables CORS entirely (no cross-origin requests allowed).
+    pub cors_allowed_origins: Vec<Regex>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -54,8 +59,32 @@ impl Config {
             jwt_secret: required("JWT_SECRET"),
             access_token_duration: required_duration("ACCESS_TOKEN_DURATION"),
             refresh_token_duration: required_duration("REFRESH_TOKEN_DURATION"),
+            cors_allowed_origins: optional_regex_list("CORS_ALLOWED_ORIGINS"),
         }
     }
+}
+
+/// Reads an optional comma-separated list of regex patterns (CORS origins).
+///
+/// Each entry is compiled and matched against the request's `Origin` header
+/// (scheme + host + port); a lone `*` is a shortcut for "any origin". A missing
+/// or empty variable yields an empty list (CORS disabled). An invalid regex
+/// fails fast at startup with a clear message.
+fn optional_regex_list(key: &str) -> Vec<Regex> {
+    let Ok(raw) = env::var(key) else {
+        return Vec::new();
+    };
+
+    raw.split(',')
+        .map(str::trim)
+        .filter(|pattern| !pattern.is_empty())
+        .map(|pattern| {
+            let source = if pattern == "*" { ".*" } else { pattern };
+            Regex::new(source).unwrap_or_else(|err| {
+                panic!("environment variable `{key}`: invalid origin regex `{pattern}`: {err}")
+            })
+        })
+        .collect()
 }
 
 /// Reads a mandatory environment variable holding a duration in seconds.

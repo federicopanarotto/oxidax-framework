@@ -188,13 +188,26 @@ validation extractor's `ErrorResponse`.
   `tracing::info!` formatted as `METHOD path status elapsed_ms` (e.g.
   `POST /api/reports 201 3ms`), status via `as_u16()`, path+query.
 
+### CORS
+- `oxidax-core/src/cors.rs`: `layer(patterns: &[Regex]) -> Option<CorsLayer>`
+  (built on `tower-http` `CorsLayer` + `AllowOrigin::predicate`, because
+  `tower-http` only supports exact origins out of the box). Applied outermost in
+  `app::assemble` so preflight `OPTIONS` is answered before routing.
+- Config: `Config::cors_allowed_origins: Vec<Regex>`, from the **optional**
+  `CORS_ALLOWED_ORIGINS` env var (comma-separated regexes matched against the
+  full `Origin` header; a lone `*` → `.*`). Empty/unset = CORS disabled. Invalid
+  regex panics at startup with a clear message.
+- Allows methods `GET/POST/PUT/PATCH/DELETE/OPTIONS`, headers
+  `Authorization`/`Content-Type`/`Accept`, and exposes `X-TOTAL-LIST`.
+
 ### Configuration
 - `Config::from_env()` loads `.env` (`dotenvy::dotenv().ok()`, existing env vars
   win) and reads **all** variables with **no default** (helper `required` →
   explicit panic if missing).
 - Variables: `SERVER_ADDR`, `DB_BACKEND` (`surreal` | `memory`), `SURREAL_URL`,
   `SURREAL_NS`, `SURREAL_DB`, `SURREAL_USER`, `SURREAL_PASS`, `JWT_SECRET`,
-  `ACCESS_TOKEN_DURATION` (900), `REFRESH_TOKEN_DURATION` (604800).
+  `ACCESS_TOKEN_DURATION` (900), `REFRESH_TOKEN_DURATION` (604800). Optional:
+  `CORS_ALLOWED_ORIGINS` (comma-separated regex allow-list; empty = CORS off).
 - `.env` is git-ignored; `.env.example` is the template. `main.rs` loads dotenv
   **before** setting up tracing (so `RUST_LOG` from the file applies).
 - `Config::memory()` uses the memory backend (tests) but still reads the rest from
@@ -263,10 +276,10 @@ validation extractor's `ErrorResponse`.
 
 ## Status and verification
 
-- **Tests**: 40 integration tests over real HTTP with the `mem://` backend —
+- **Tests**: 45 integration tests over real HTTP with the `mem://` backend —
   `auth.rs` 13, `categories.rs` 5, `crud.rs` 5, `places.rs` 4, `service.rs` 4,
-  `creator.rs` 3, `users.rs` 3, `pagination.rs` 2, `docs.rs` 1.
-  `cargo test --workspace` → 40 passed.
+  `cors.rs` 4, `creator.rs` 3, `users.rs` 3, `pagination.rs` 2, `color.rs` 1
+  (generated feature kept), `docs.rs` 1. `cargo test --workspace` → 45 passed.
 - `cargo check --workspace --all-targets`, `cargo clippy --workspace --all-targets
   -- -D warnings` and `cargo fmt --all` all clean.
 - The `new-feature` generator was verified end-to-end: it scaffolds a compiling
@@ -349,6 +362,6 @@ or `cargo run` (SurrealDB from `.env`). UI: http://localhost:3000/swagger-ui.
 - Zero-touch `src/db.rs` (dynamic repository registry) to remove the last manual
   shared edit.
 - E2E tests on a real SurrealDB backend (today only `mem://` is covered).
-- More "Express style" middleware beyond the access log and the per-route guard
-  (e.g. rate limiting, CORS, request id).
+- More "Express style" middleware beyond the access log, CORS and the per-route
+  guard (e.g. rate limiting, security headers, request id).
 - Commit only on explicit request.

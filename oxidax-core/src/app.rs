@@ -17,6 +17,7 @@ use di::singleton_factory;
 use utoipa::openapi::OpenApi;
 
 use crate::config::Config;
+use crate::cors;
 use crate::docs;
 use crate::errors::{AppError, AppResult, pipeline};
 use crate::middlewares::access_log::access_log;
@@ -76,6 +77,14 @@ pub fn assemble(
     let router = router
         .fallback(pipeline::route_not_found)
         .layer(from_fn(access_log));
+
+    // CORS sits outermost so preflight (`OPTIONS`) requests are answered before
+    // routing and the headers are added to every response, errors included. It
+    // is only installed when an origin allow-list is configured.
+    let router = match cors::layer(&config.cors_allowed_origins) {
+        Some(cors) => router.layer(cors),
+        None => router,
+    };
 
     Ok((router, provider))
 }

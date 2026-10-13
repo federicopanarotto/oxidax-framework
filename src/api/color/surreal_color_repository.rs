@@ -55,7 +55,10 @@ fn created_or_internal(item: Color, created: Option<ColorRow>) -> AppResult<Colo
     if created.is_some() {
         Ok(item)
     } else {
-        Err(AppError::Internal(format!("failed to create color {}", item.id)))
+        Err(AppError::Internal(format!(
+            "failed to create color {}",
+            item.id
+        )))
     }
 }
 

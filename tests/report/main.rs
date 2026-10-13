@@ -3,6 +3,8 @@
 
 mod auth;
 mod categories;
+mod color;
+mod cors;
 mod creator;
 mod crud;
 mod docs;
@@ -11,4 +13,3 @@ mod places;
 mod service;
 mod support;
 mod users;
-mod color;

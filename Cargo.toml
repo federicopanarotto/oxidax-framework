@@ -34,3 +34,4 @@ oxidax-core = { path = "oxidax-core" }
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }
+regex = "1"

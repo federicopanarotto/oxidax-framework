@@ -5,7 +5,7 @@ use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::Response;
 
-use crate::api::color::color_dto::{CreateColorDto, ColorResponse, UpdateColorDto};
+use crate::api::color::color_dto::{ColorResponse, CreateColorDto, UpdateColorDto};
 use crate::api::color::color_service::ColorService;
 use crate::errors::{AppResult, BadRequestResponse, ErrorResponse};
 use crate::framework::{PaginationQuery, ValidatedJson, ValidatedQuery, route};

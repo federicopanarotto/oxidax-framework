@@ -14,14 +14,14 @@ use surrealdb::engine::any::Any;
 
 use crate::api::categories::category_repository::CategoryRepository;
 use crate::api::categories::surreal_category_repository::SurrealCategoryRepository;
+use crate::api::color::color_repository::ColorRepository;
+use crate::api::color::surreal_color_repository::SurrealColorRepository;
 use crate::api::places::place_repository::PlaceRepository;
 use crate::api::places::surreal_place_repository::SurrealPlaceRepository;
 use crate::api::reports::report_repository::ReportRepository;
 use crate::api::reports::surreal_report_repository::SurrealReportRepository;
 use crate::api::users::surreal_user_repository::SurrealUserRepository;
 use crate::api::users::user_repository::UserRepository;
-use crate::api::color::color_repository::ColorRepository;
-use crate::api::color::surreal_color_repository::SurrealColorRepository;
 use crate::config::{Config, DbBackend};
 use crate::errors::AppResult;
 use crate::framework::register_repository;

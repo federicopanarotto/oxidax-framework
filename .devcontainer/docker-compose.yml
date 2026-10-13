@@ -12,10 +12,10 @@ services:
     ports:
       - "3000:3000"
     environment:
-      RUST_LOG: info,axum_api=debug
+      RUST_LOG: info,oxidax=debug,oxidax_core=debug
       SERVER_ADDR: 0.0.0.0:3000
       DB_BACKEND: surreal
-      SURREAL_URL: ws://surrealdb:8000
+      SURREAL_URL: ws://surrealdb:12129
       SURREAL_USER: root
       SURREAL_PASS: root
       CARGO_TARGET_DIR: /cargo-target
@@ -24,9 +24,9 @@ services:
 
   surrealdb:
     image: surrealdb/surrealdb:latest
-    command: start --user root --pass root --bind 0.0.0.0:8000
+    command: start --user root --pass root --bind 0.0.0.0:12129
     ports:
-      - "8000:8000"
+      - "12129:12129"
 
 volumes:
   cargo-registry:

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use di::injectable;
 
-use crate::api::color::color_dto::{CreateColorDto, ColorResponse, UpdateColorDto};
+use crate::api::color::color_dto::{ColorResponse, CreateColorDto, UpdateColorDto};
 use crate::api::color::color_repository::ColorRepository;
 use crate::errors::{AppError, AppResult};
 use crate::lib::pagination::{Paged, Pagination};
