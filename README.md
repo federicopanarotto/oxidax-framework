@@ -2,7 +2,7 @@
   <img src="LOGO.png" alt="Oxidax logo" width="220">
 </p>
 
-<h1 align="center">Oxidax</h1>
+<h1 align="center">Oxidax Framework</h1>
 
 <p align="center">
   <em>An experimental framework for building REST APIs in Rust with an Express-like developer experience.</em>
@@ -197,6 +197,13 @@ cargo new-feature      # alias for: cargo xtask new-feature
   the 404 fallback, and applies the access log as the outermost layer.
 - There is no exported `openapi.json`: the specification is served live at
   `/api-docs/openapi.json` and the Scalar UI at `/scalar`.
+- **Automatic error examples**: `oxidax_core::errors::ErrorExamples` walks the merged
+  OpenAPI tree after collecting all feature paths and injects, for each documented
+  error status (`400,401,403,404,409,413,415,422,500,503`), the shared
+  `ErrorResponse` schema plus a correct example. The example message is taken
+  directly from the response's `description`, so controllers only declare
+  `(status = ..., description = "...")` (no `body = ...`). This keeps error docs
+  centralized, correct and easy to maintain.
 
 ### Validation and response contract
 
