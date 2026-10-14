@@ -20,6 +20,7 @@ use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme};
 use utoipa::{Modify, OpenApi};
 
 use crate::app::AppInfo;
+use crate::errors::{ErrorExamples, ErrorResponse};
 
 /// Path of the live OpenAPI document, consumed both by the Scalar UI and by any
 /// external client.
@@ -34,7 +35,10 @@ const SCALAR_CDN: &str = "https://cdn.jsdelivr.net/npm/@scalar/api-reference";
 /// Documentation base: shared components only (the `info` block is filled in by
 /// [`build`] from the application metadata).
 #[derive(OpenApi)]
-#[openapi(modifiers(&SecuritySchemes))]
+#[openapi(
+    modifiers(&SecuritySchemes),
+    components(schemas(ErrorResponse)),
+)]
 pub struct ApiDoc;
 
 /// Declares the bearer scheme referenced by the `security(...)` annotations of
@@ -61,6 +65,9 @@ fn bearer_jwt() -> SecurityScheme {
 
 /// Merges the OpenAPI components produced by individual features into the
 /// base document, filling the `info` block with the application metadata.
+///
+/// The error examples are injected at the end, once every feature fragment has
+/// been merged, so [`ErrorExamples`] can walk the complete set of paths.
 pub fn build(feature_apis: Vec<Spec>, info: AppInfo<'_>) -> Spec {
     let mut api = ApiDoc::openapi();
     api.info.title = info.title.to_string();
@@ -69,6 +76,7 @@ pub fn build(feature_apis: Vec<Spec>, info: AppInfo<'_>) -> Spec {
     for feature in feature_apis {
         api.merge(feature);
     }
+    ErrorExamples.modify(&mut api);
     api
 }
 

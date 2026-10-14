@@ -10,7 +10,7 @@
 //! ```
 
 pub use crate::auth::CurrentUser;
-pub use crate::errors::{AppError, AppResult, BadRequestResponse, ErrorResponse};
+pub use crate::errors::{AppError, AppResult, ErrorResponse};
 pub use crate::middlewares::validation_middleware::{
     ValidatedJson, ValidatedParams, ValidatedQuery,
 };

@@ -7,7 +7,7 @@ use axum::response::Response;
 
 use crate::api::color::color_dto::{ColorResponse, CreateColorDto, UpdateColorDto};
 use crate::api::color::color_service::ColorService;
-use crate::errors::{AppResult, BadRequestResponse, ErrorResponse};
+use crate::errors::AppResult;
 use crate::framework::{PaginationQuery, ValidatedJson, ValidatedQuery, route};
 
 // Route table and OpenAPI spec of the color feature, defined point-inline:
@@ -25,8 +25,8 @@ use crate::framework::{PaginationQuery, ValidatedJson, ValidatedQuery, route};
     ),
     responses(
         (status = 200, description = "Paginated list of colors; the total is returned in the `X-TOTAL-LIST` header", body = [ColorResponse], headers(("X-TOTAL-LIST" = u64, description = "Total number of colors across every page"))),
-        (status = 422, description = "Invalid pagination parameters", body = ErrorResponse),
-        (status = 503, description = "Database unavailable", body = ErrorResponse),
+        (status = 422, description = "Invalid pagination parameters"),
+        (status = 503, description = "Database unavailable"),
     ),
 )]
 pub async fn list_colors(
@@ -45,9 +45,9 @@ pub async fn list_colors(
     request_body = CreateColorDto,
     responses(
         (status = 201, description = "Color created successfully", body = ColorResponse),
-        (status = 400, description = "Invalid request: malformed JSON body", body = BadRequestResponse),
-        (status = 422, description = "Field validation failed", body = ErrorResponse),
-        (status = 503, description = "Database unavailable", body = ErrorResponse),
+        (status = 400, description = "Invalid request: malformed JSON body"),
+        (status = 422, description = "Field validation failed"),
+        (status = 503, description = "Database unavailable"),
     ),
 )]
 pub async fn create_color(
@@ -66,8 +66,8 @@ pub async fn create_color(
     params(("id" = String, Path, description = "Color id")),
     responses(
         (status = 200, description = "Color found", body = ColorResponse),
-        (status = 404, description = "Color not found", body = ErrorResponse),
-        (status = 503, description = "Database unavailable", body = ErrorResponse),
+        (status = 404, description = "Color not found"),
+        (status = 503, description = "Database unavailable"),
     ),
 )]
 pub async fn get_color(
@@ -86,10 +86,10 @@ pub async fn get_color(
     request_body = UpdateColorDto,
     responses(
         (status = 200, description = "Color updated", body = ColorResponse),
-        (status = 400, description = "Invalid request: malformed JSON body", body = BadRequestResponse),
-        (status = 404, description = "Color not found", body = ErrorResponse),
-        (status = 422, description = "Field validation failed", body = ErrorResponse),
-        (status = 503, description = "Database unavailable", body = ErrorResponse),
+        (status = 400, description = "Invalid request: malformed JSON body"),
+        (status = 404, description = "Color not found"),
+        (status = 422, description = "Field validation failed"),
+        (status = 503, description = "Database unavailable"),
     ),
 )]
 pub async fn update_color(
@@ -108,8 +108,8 @@ pub async fn update_color(
     params(("id" = String, Path, description = "Color id")),
     responses(
         (status = 204, description = "Color deleted"),
-        (status = 404, description = "Color not found", body = ErrorResponse),
-        (status = 503, description = "Database unavailable", body = ErrorResponse),
+        (status = 404, description = "Color not found"),
+        (status = 503, description = "Database unavailable"),
     ),
 )]
 pub async fn delete_color(

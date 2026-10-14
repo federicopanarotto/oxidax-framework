@@ -7,7 +7,7 @@ use axum::response::Response;
 
 use crate::api::places::place_dto::{CreatePlaceDto, PlaceResponse, UpdatePlaceDto};
 use crate::api::places::place_service::PlaceService;
-use crate::errors::{AppResult, BadRequestResponse, ErrorResponse};
+use crate::errors::AppResult;
 use crate::framework::{PaginationQuery, ValidatedJson, ValidatedQuery, route};
 
 // Route table and OpenAPI spec of the places, defined point-inline: every
@@ -26,8 +26,8 @@ use crate::framework::{PaginationQuery, ValidatedJson, ValidatedQuery, route};
     ),
     responses(
         (status = 200, description = "Paginated list of places; the total number of elements is returned in the `X-TOTAL-LIST` header", body = [PlaceResponse], headers(("X-TOTAL-LIST" = u64, description = "Total number of places across every page"))),
-        (status = 422, description = "Invalid pagination parameters", body = ErrorResponse),
-        (status = 503, description = "Database unavailable", body = ErrorResponse),
+        (status = 422, description = "Invalid pagination parameters"),
+        (status = 503, description = "Database unavailable"),
     ),
 )]
 pub async fn list_places(
@@ -46,9 +46,9 @@ pub async fn list_places(
     request_body = CreatePlaceDto,
     responses(
         (status = 201, description = "Place created successfully", body = PlaceResponse),
-        (status = 400, description = "Invalid request: malformed JSON body", body = BadRequestResponse),
-        (status = 422, description = "Field validation failed", body = ErrorResponse),
-        (status = 503, description = "Database unavailable", body = ErrorResponse),
+        (status = 400, description = "Invalid request: malformed JSON body"),
+        (status = 422, description = "Field validation failed"),
+        (status = 503, description = "Database unavailable"),
     ),
 )]
 pub async fn create_place(
@@ -67,8 +67,8 @@ pub async fn create_place(
     params(("id" = String, Path, description = "Place id")),
     responses(
         (status = 200, description = "Place found", body = PlaceResponse),
-        (status = 404, description = "Place not found", body = ErrorResponse),
-        (status = 503, description = "Database unavailable", body = ErrorResponse),
+        (status = 404, description = "Place not found"),
+        (status = 503, description = "Database unavailable"),
     ),
 )]
 pub async fn get_place(
@@ -87,10 +87,10 @@ pub async fn get_place(
     request_body = UpdatePlaceDto,
     responses(
         (status = 200, description = "Place updated", body = PlaceResponse),
-        (status = 400, description = "Invalid request: malformed JSON body", body = BadRequestResponse),
-        (status = 404, description = "Place not found", body = ErrorResponse),
-        (status = 422, description = "Field validation failed", body = ErrorResponse),
-        (status = 503, description = "Database unavailable", body = ErrorResponse),
+        (status = 400, description = "Invalid request: malformed JSON body"),
+        (status = 404, description = "Place not found"),
+        (status = 422, description = "Field validation failed"),
+        (status = 503, description = "Database unavailable"),
     ),
 )]
 pub async fn update_place(
@@ -109,8 +109,8 @@ pub async fn update_place(
     params(("id" = String, Path, description = "Place id")),
     responses(
         (status = 204, description = "Place deleted"),
-        (status = 404, description = "Place not found", body = ErrorResponse),
-        (status = 503, description = "Database unavailable", body = ErrorResponse),
+        (status = 404, description = "Place not found"),
+        (status = 503, description = "Database unavailable"),
     ),
 )]
 pub async fn delete_place(

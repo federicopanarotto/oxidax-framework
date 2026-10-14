@@ -9,7 +9,7 @@ use crate::api::categories::category_dto::{
     CategoryResponse, CreateCategoryDto, UpdateCategoryDto,
 };
 use crate::api::categories::category_service::CategoryService;
-use crate::errors::{AppResult, BadRequestResponse, ErrorResponse};
+use crate::errors::AppResult;
 use crate::framework::{PaginationQuery, ValidatedJson, ValidatedQuery, route};
 
 // Route table and OpenAPI spec of the categories, defined point-inline: every
@@ -28,8 +28,8 @@ use crate::framework::{PaginationQuery, ValidatedJson, ValidatedQuery, route};
     ),
     responses(
         (status = 200, description = "Paginated list of categories; the total number of elements is returned in the `X-TOTAL-LIST` header", body = [CategoryResponse], headers(("X-TOTAL-LIST" = u64, description = "Total number of categories across every page"))),
-        (status = 422, description = "Invalid pagination parameters", body = ErrorResponse),
-        (status = 503, description = "Database unavailable", body = ErrorResponse),
+        (status = 422, description = "Invalid pagination parameters"),
+        (status = 503, description = "Database unavailable"),
     ),
 )]
 pub async fn list_categories(
@@ -48,9 +48,9 @@ pub async fn list_categories(
     request_body = CreateCategoryDto,
     responses(
         (status = 201, description = "Category created successfully", body = CategoryResponse),
-        (status = 400, description = "Invalid request: malformed JSON body", body = BadRequestResponse),
-        (status = 422, description = "Field validation failed", body = ErrorResponse),
-        (status = 503, description = "Database unavailable", body = ErrorResponse),
+        (status = 400, description = "Invalid request: malformed JSON body"),
+        (status = 422, description = "Field validation failed"),
+        (status = 503, description = "Database unavailable"),
     ),
 )]
 pub async fn create_category(
@@ -69,8 +69,8 @@ pub async fn create_category(
     params(("id" = String, Path, description = "Category id")),
     responses(
         (status = 200, description = "Category found", body = CategoryResponse),
-        (status = 404, description = "Category not found", body = ErrorResponse),
-        (status = 503, description = "Database unavailable", body = ErrorResponse),
+        (status = 404, description = "Category not found"),
+        (status = 503, description = "Database unavailable"),
     ),
 )]
 pub async fn get_category(
@@ -89,10 +89,10 @@ pub async fn get_category(
     request_body = UpdateCategoryDto,
     responses(
         (status = 200, description = "Category updated", body = CategoryResponse),
-        (status = 400, description = "Invalid request: malformed JSON body", body = BadRequestResponse),
-        (status = 404, description = "Category not found", body = ErrorResponse),
-        (status = 422, description = "Field validation failed", body = ErrorResponse),
-        (status = 503, description = "Database unavailable", body = ErrorResponse),
+        (status = 400, description = "Invalid request: malformed JSON body"),
+        (status = 404, description = "Category not found"),
+        (status = 422, description = "Field validation failed"),
+        (status = 503, description = "Database unavailable"),
     ),
 )]
 pub async fn update_category(
@@ -111,8 +111,8 @@ pub async fn update_category(
     params(("id" = String, Path, description = "Category id")),
     responses(
         (status = 204, description = "Category deleted"),
-        (status = 404, description = "Category not found", body = ErrorResponse),
-        (status = 503, description = "Database unavailable", body = ErrorResponse),
+        (status = 404, description = "Category not found"),
+        (status = 503, description = "Database unavailable"),
     ),
 )]
 pub async fn delete_category(

@@ -8,7 +8,7 @@ use crate::api::auth::auth_dto::{
     LoginRequest, MessageResponse, RefreshRequest, RegisterRequest, TokenResponse,
 };
 use crate::api::auth::auth_service::AuthService;
-use crate::errors::{AppResult, BadRequestResponse, ErrorResponse};
+use crate::errors::AppResult;
 use crate::framework::{CurrentUser, ValidatedJson, route};
 
 // Route table and OpenAPI spec of the authentication, defined point-inline:
@@ -26,10 +26,10 @@ use crate::framework::{CurrentUser, ValidatedJson, route};
     request_body = RegisterRequest,
     responses(
         (status = 201, description = "User registered successfully", body = MessageResponse),
-        (status = 400, description = "Invalid request: malformed JSON body", body = BadRequestResponse),
-        (status = 409, description = "Registration could not be completed", body = ErrorResponse),
-        (status = 422, description = "Field validation failed", body = ErrorResponse),
-        (status = 503, description = "Database unavailable", body = ErrorResponse),
+        (status = 400, description = "Invalid request: malformed JSON body"),
+        (status = 409, description = "Registration could not be completed"),
+        (status = 422, description = "Field validation failed"),
+        (status = 503, description = "Database unavailable"),
     ),
 )]
 pub async fn register(
@@ -48,10 +48,10 @@ pub async fn register(
     request_body = LoginRequest,
     responses(
         (status = 200, description = "Tokens issued", body = TokenResponse),
-        (status = 400, description = "Invalid request: malformed JSON body", body = BadRequestResponse),
-        (status = 401, description = "Invalid credentials (wrong email or wrong password)", body = ErrorResponse),
-        (status = 422, description = "Field validation failed", body = ErrorResponse),
-        (status = 503, description = "Database unavailable", body = ErrorResponse),
+        (status = 400, description = "Invalid request: malformed JSON body"),
+        (status = 401, description = "Invalid credentials (wrong email or wrong password)"),
+        (status = 422, description = "Field validation failed"),
+        (status = 503, description = "Database unavailable"),
     ),
 )]
 pub async fn login(
@@ -69,10 +69,10 @@ pub async fn login(
     request_body = RefreshRequest,
     responses(
         (status = 200, description = "New token pair issued; the previous refresh token is no longer valid", body = TokenResponse),
-        (status = 400, description = "Invalid request: malformed JSON body", body = BadRequestResponse),
-        (status = 401, description = "Invalid, expired or already used refresh token", body = ErrorResponse),
-        (status = 422, description = "Field validation failed", body = ErrorResponse),
-        (status = 503, description = "Database unavailable", body = ErrorResponse),
+        (status = 400, description = "Invalid request: malformed JSON body"),
+        (status = 401, description = "Invalid, expired or already used refresh token"),
+        (status = 422, description = "Field validation failed"),
+        (status = 503, description = "Database unavailable"),
     ),
     security(
         ("refreshToken" = []),
@@ -92,8 +92,8 @@ pub async fn refresh_session(
     tag = "auth",
     responses(
         (status = 204, description = "Session revoked: the outstanding refresh token no longer works"),
-        (status = 401, description = "Missing or invalid access token", body = ErrorResponse),
-        (status = 503, description = "Database unavailable", body = ErrorResponse),
+        (status = 401, description = "Missing or invalid access token"),
+        (status = 503, description = "Database unavailable"),
     ),
     security(
         ("accessToken" = []),

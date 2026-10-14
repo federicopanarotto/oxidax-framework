@@ -7,7 +7,7 @@ use axum::response::Response;
 
 use crate::api::uploads::upload_dto::{AssetResponse, UploadForm};
 use crate::api::uploads::upload_service::UploadService;
-use crate::errors::{AppResult, BadRequestResponse, ErrorResponse};
+use crate::errors::AppResult;
 use crate::framework::{CurrentUser, PaginationQuery, Upload, ValidatedQuery, route};
 
 // Route table and OpenAPI spec of the uploads, defined point-inline: every
@@ -25,8 +25,8 @@ use crate::framework::{CurrentUser, PaginationQuery, Upload, ValidatedQuery, rou
     ),
     responses(
         (status = 200, description = "Paginated list of assets; the total number of elements is returned in the `X-TOTAL-LIST` header", body = [AssetResponse], headers(("X-TOTAL-LIST" = u64, description = "Total number of assets across every page"))),
-        (status = 422, description = "Invalid pagination parameters", body = ErrorResponse),
-        (status = 503, description = "Database unavailable", body = ErrorResponse),
+        (status = 422, description = "Invalid pagination parameters"),
+        (status = 503, description = "Database unavailable"),
     ),
 )]
 pub async fn list_uploaded_files(
@@ -45,11 +45,11 @@ pub async fn list_uploaded_files(
     request_body(content = UploadForm, content_type = "multipart/form-data"),
     responses(
         (status = 201, description = "File uploaded successfully", body = AssetResponse),
-        (status = 400, description = "Invalid request: missing `file` field or malformed multipart body", body = BadRequestResponse),
-        (status = 401, description = "Authentication required", body = ErrorResponse),
-        (status = 413, description = "File too large or too many files", body = ErrorResponse),
-        (status = 415, description = "File extension not allowed", body = ErrorResponse),
-        (status = 503, description = "Database unavailable", body = ErrorResponse),
+        (status = 400, description = "Invalid request: missing `file` field or malformed multipart body"),
+        (status = 401, description = "Authentication required"),
+        (status = 413, description = "File too large or too many files"),
+        (status = 415, description = "File extension not allowed"),
+        (status = 503, description = "Database unavailable"),
     ),
     security(
         ("accessToken" = []),
@@ -73,8 +73,8 @@ pub async fn upload_file(
     params(("id" = String, Path, description = "Asset id")),
     responses(
         (status = 200, description = "The stored file, streamed with its original content type"),
-        (status = 404, description = "Asset not found", body = ErrorResponse),
-        (status = 503, description = "Database unavailable", body = ErrorResponse),
+        (status = 404, description = "Asset not found"),
+        (status = 503, description = "Database unavailable"),
     ),
 )]
 pub async fn download_file(
@@ -93,10 +93,10 @@ pub async fn download_file(
     params(("id" = String, Path, description = "Asset id")),
     responses(
         (status = 204, description = "Asset deleted"),
-        (status = 401, description = "Authentication required", body = ErrorResponse),
-        (status = 403, description = "The asset belongs to another user", body = ErrorResponse),
-        (status = 404, description = "Asset not found", body = ErrorResponse),
-        (status = 503, description = "Database unavailable", body = ErrorResponse),
+        (status = 401, description = "Authentication required"),
+        (status = 403, description = "The asset belongs to another user"),
+        (status = 404, description = "Asset not found"),
+        (status = 503, description = "Database unavailable"),
     ),
     security(
         ("accessToken" = []),

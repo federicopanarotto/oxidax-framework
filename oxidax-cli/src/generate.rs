@@ -666,7 +666,7 @@ fn controller_source(name: &str, pascal: &str, plural: &str) -> String {
          \n\
          use crate::api::{name}::{name}_dto::{{Create{pascal}Dto, {pascal}Response, Update{pascal}Dto}};\n\
          use crate::api::{name}::{name}_service::{pascal}Service;\n\
-         use crate::errors::{{AppResult, BadRequestResponse, ErrorResponse}};\n\
+         use crate::errors::AppResult;\n\
          use crate::framework::{{PaginationQuery, ValidatedJson, ValidatedQuery, route}};\n\
          \n\
          // Route table and OpenAPI spec of the {name} feature, defined point-inline:\n\
@@ -684,8 +684,8 @@ fn controller_source(name: &str, pascal: &str, plural: &str) -> String {
          \x20   ),\n\
          \x20   responses(\n\
          \x20       (status = 200, description = \"Paginated list of {plural}; the total is returned in the `X-TOTAL-LIST` header\", body = [{pascal}Response], headers((\"X-TOTAL-LIST\" = u64, description = \"Total number of {plural} across every page\"))),\n\
-         \x20       (status = 422, description = \"Invalid pagination parameters\", body = ErrorResponse),\n\
-         \x20       (status = 503, description = \"Database unavailable\", body = ErrorResponse),\n\
+         \x20       (status = 422, description = \"Invalid pagination parameters\"),\n\
+         \x20       (status = 503, description = \"Database unavailable\"),\n\
          \x20   ),\n\
          )]\n\
          pub async fn list_{plural}(\n\
@@ -704,9 +704,9 @@ fn controller_source(name: &str, pascal: &str, plural: &str) -> String {
          \x20   request_body = Create{pascal}Dto,\n\
          \x20   responses(\n\
          \x20       (status = 201, description = \"{pascal} created successfully\", body = {pascal}Response),\n\
-         \x20       (status = 400, description = \"Invalid request: malformed JSON body\", body = BadRequestResponse),\n\
-         \x20       (status = 422, description = \"Field validation failed\", body = ErrorResponse),\n\
-         \x20       (status = 503, description = \"Database unavailable\", body = ErrorResponse),\n\
+         \x20       (status = 400, description = \"Invalid request: malformed JSON body\"),\n\
+         \x20       (status = 422, description = \"Field validation failed\"),\n\
+         \x20       (status = 503, description = \"Database unavailable\"),\n\
          \x20   ),\n\
          )]\n\
          pub async fn create_{name}(\n\
@@ -725,8 +725,8 @@ fn controller_source(name: &str, pascal: &str, plural: &str) -> String {
          \x20   params((\"id\" = String, Path, description = \"{pascal} id\")),\n\
          \x20   responses(\n\
          \x20       (status = 200, description = \"{pascal} found\", body = {pascal}Response),\n\
-         \x20       (status = 404, description = \"{pascal} not found\", body = ErrorResponse),\n\
-         \x20       (status = 503, description = \"Database unavailable\", body = ErrorResponse),\n\
+         \x20       (status = 404, description = \"{pascal} not found\"),\n\
+         \x20       (status = 503, description = \"Database unavailable\"),\n\
          \x20   ),\n\
          )]\n\
          pub async fn get_{name}(\n\
@@ -745,10 +745,10 @@ fn controller_source(name: &str, pascal: &str, plural: &str) -> String {
          \x20   request_body = Update{pascal}Dto,\n\
          \x20   responses(\n\
          \x20       (status = 200, description = \"{pascal} updated\", body = {pascal}Response),\n\
-         \x20       (status = 400, description = \"Invalid request: malformed JSON body\", body = BadRequestResponse),\n\
-         \x20       (status = 404, description = \"{pascal} not found\", body = ErrorResponse),\n\
-         \x20       (status = 422, description = \"Field validation failed\", body = ErrorResponse),\n\
-         \x20       (status = 503, description = \"Database unavailable\", body = ErrorResponse),\n\
+         \x20       (status = 400, description = \"Invalid request: malformed JSON body\"),\n\
+         \x20       (status = 404, description = \"{pascal} not found\"),\n\
+         \x20       (status = 422, description = \"Field validation failed\"),\n\
+         \x20       (status = 503, description = \"Database unavailable\"),\n\
          \x20   ),\n\
          )]\n\
          pub async fn update_{name}(\n\
@@ -767,8 +767,8 @@ fn controller_source(name: &str, pascal: &str, plural: &str) -> String {
          \x20   params((\"id\" = String, Path, description = \"{pascal} id\")),\n\
          \x20   responses(\n\
          \x20       (status = 204, description = \"{pascal} deleted\"),\n\
-         \x20       (status = 404, description = \"{pascal} not found\", body = ErrorResponse),\n\
-         \x20       (status = 503, description = \"Database unavailable\", body = ErrorResponse),\n\
+         \x20       (status = 404, description = \"{pascal} not found\"),\n\
+         \x20       (status = 503, description = \"Database unavailable\"),\n\
          \x20   ),\n\
          )]\n\
          pub async fn delete_{name}(\n\

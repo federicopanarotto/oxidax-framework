@@ -7,7 +7,7 @@ use axum::response::Response;
 
 use crate::api::reports::report_dto::{CreateReportDto, ReportResponse, UpdateReportDto};
 use crate::api::reports::report_service::ReportService;
-use crate::errors::{AppResult, BadRequestResponse, ErrorResponse};
+use crate::errors::AppResult;
 use crate::framework::{CurrentUser, PaginationQuery, ValidatedJson, ValidatedQuery, route};
 
 // Route table and OpenAPI spec of the reports, defined point-inline: every
@@ -26,8 +26,8 @@ use crate::framework::{CurrentUser, PaginationQuery, ValidatedJson, ValidatedQue
     ),
     responses(
         (status = 200, description = "Paginated list of reports; the total number of elements is returned in the `X-TOTAL-LIST` header", body = [ReportResponse], headers(("X-TOTAL-LIST" = u64, description = "Total number of reports across every page"))),
-        (status = 422, description = "Invalid pagination parameters", body = ErrorResponse),
-        (status = 503, description = "Database unavailable", body = ErrorResponse),
+        (status = 422, description = "Invalid pagination parameters"),
+        (status = 503, description = "Database unavailable"),
     ),
 )]
 pub async fn list_reports(
@@ -46,10 +46,10 @@ pub async fn list_reports(
     request_body = CreateReportDto,
     responses(
         (status = 201, description = "Report created successfully", body = ReportResponse),
-        (status = 400, description = "Invalid request: malformed JSON body or non-existent category", body = BadRequestResponse),
-        (status = 401, description = "Missing or invalid access token", body = ErrorResponse),
-        (status = 422, description = "Field validation failed", body = ErrorResponse),
-        (status = 503, description = "Database unavailable", body = ErrorResponse),
+        (status = 400, description = "Invalid request: malformed JSON body or non-existent category"),
+        (status = 401, description = "Missing or invalid access token"),
+        (status = 422, description = "Field validation failed"),
+        (status = 503, description = "Database unavailable"),
     ),
     security(
         ("accessToken" = []),
@@ -73,8 +73,8 @@ pub async fn create_report(
     params(("id" = String, Path, description = "Report id")),
     responses(
         (status = 200, description = "Report found", body = ReportResponse),
-        (status = 404, description = "Report not found", body = ErrorResponse),
-        (status = 503, description = "Database unavailable", body = ErrorResponse),
+        (status = 404, description = "Report not found"),
+        (status = 503, description = "Database unavailable"),
     ),
 )]
 pub async fn get_report(
@@ -93,11 +93,11 @@ pub async fn get_report(
     request_body = UpdateReportDto,
     responses(
         (status = 200, description = "Report updated", body = ReportResponse),
-        (status = 400, description = "Invalid request: malformed JSON body or non-existent category", body = BadRequestResponse),
-        (status = 401, description = "Missing or invalid access token", body = ErrorResponse),
-        (status = 404, description = "Report not found", body = ErrorResponse),
-        (status = 422, description = "Field validation failed", body = ErrorResponse),
-        (status = 503, description = "Database unavailable", body = ErrorResponse),
+        (status = 400, description = "Invalid request: malformed JSON body or non-existent category"),
+        (status = 401, description = "Missing or invalid access token"),
+        (status = 404, description = "Report not found"),
+        (status = 422, description = "Field validation failed"),
+        (status = 503, description = "Database unavailable"),
     ),
     security(
         ("accessToken" = []),
@@ -120,9 +120,9 @@ pub async fn update_report(
     params(("id" = String, Path, description = "Report id")),
     responses(
         (status = 204, description = "Report deleted"),
-        (status = 401, description = "Missing or invalid access token", body = ErrorResponse),
-        (status = 404, description = "Report not found", body = ErrorResponse),
-        (status = 503, description = "Database unavailable", body = ErrorResponse),
+        (status = 401, description = "Missing or invalid access token"),
+        (status = 404, description = "Report not found"),
+        (status = 503, description = "Database unavailable"),
     ),
     security(
         ("accessToken" = []),

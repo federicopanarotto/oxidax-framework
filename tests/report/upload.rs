@@ -68,7 +68,7 @@ fn multipart(boundary: &str, parts: &[Part<'_>]) -> Vec<u8> {
 }
 
 fn upload_request(boundary: &str, body: Vec<u8>, token: Option<&str>) -> Request<Body> {
-    let mut builder = Request::builder().method("POST").uri("/api/upload").header(
+    let mut builder = Request::builder().method("POST").uri("/api/uploads").header(
         header::CONTENT_TYPE,
         format!("multipart/form-data; boundary={boundary}"),
     );
@@ -121,7 +121,7 @@ async fn upload_download_delete_roundtrip() {
         .clone()
         .oneshot(
             Request::builder()
-                .uri(format!("/api/upload/{id}"))
+                .uri(format!("/api/uploads/{id}"))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -147,7 +147,7 @@ async fn upload_download_delete_roundtrip() {
         .oneshot(
             Request::builder()
                 .method("DELETE")
-                .uri(format!("/api/upload/{id}"))
+                .uri(format!("/api/uploads/{id}"))
                 .header(header::AUTHORIZATION, format!("Bearer {token}"))
                 .body(Body::empty())
                 .unwrap(),
@@ -159,7 +159,7 @@ async fn upload_download_delete_roundtrip() {
     let response = app
         .oneshot(
             Request::builder()
-                .uri(format!("/api/upload/{id}"))
+                .uri(format!("/api/uploads/{id}"))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -270,7 +270,7 @@ async fn delete_is_forbidden_for_another_user() {
         .oneshot(
             Request::builder()
                 .method("DELETE")
-                .uri(format!("/api/upload/{id}"))
+                .uri(format!("/api/uploads/{id}"))
                 .header(header::AUTHORIZATION, format!("Bearer {other}"))
                 .body(Body::empty())
                 .unwrap(),
@@ -298,7 +298,7 @@ async fn list_uploaded_files_is_paginated() {
     let response = app
         .oneshot(
             Request::builder()
-                .uri("/api/upload?page=1&limit=20")
+                .uri("/api/uploads?page=1&limit=20")
                 .body(Body::empty())
                 .unwrap(),
         )

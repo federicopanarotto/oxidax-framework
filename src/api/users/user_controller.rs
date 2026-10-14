@@ -6,7 +6,7 @@ use axum::response::Response;
 
 use crate::api::users::user_dto::{UserListQueryDto, UserResponse};
 use crate::api::users::user_service::UserService;
-use crate::errors::{AppResult, ErrorResponse};
+use crate::errors::AppResult;
 use crate::framework::{CurrentUser, PaginationQuery, ValidatedQuery, route};
 
 // Route table and OpenAPI spec of the users, defined point-inline: every
@@ -23,9 +23,9 @@ use crate::framework::{CurrentUser, PaginationQuery, ValidatedQuery, route};
     tag = "users",
     responses(
         (status = 200, description = "Profile of the authenticated user", body = UserResponse),
-        (status = 401, description = "Missing or invalid access token", body = ErrorResponse),
-        (status = 404, description = "User not found", body = ErrorResponse),
-        (status = 503, description = "Database unavailable", body = ErrorResponse),
+        (status = 401, description = "Missing or invalid access token"),
+        (status = 404, description = "User not found"),
+        (status = 503, description = "Database unavailable"),
     ),
     security(
         ("accessToken" = []),
@@ -51,10 +51,10 @@ pub async fn get_me(
     ),
     responses(
         (status = 200, description = "Paginated list of users (admin only); the total number of elements is returned in the `X-TOTAL-LIST` header", body = [UserResponse], headers(("X-TOTAL-LIST" = u64, description = "Total number of users across every page"))),
-        (status = 401, description = "Missing or invalid access token", body = ErrorResponse),
-        (status = 403, description = "Role not allowed for this operation", body = ErrorResponse),
-        (status = 422, description = "Field validation failed", body = ErrorResponse),
-        (status = 503, description = "Database unavailable", body = ErrorResponse),
+        (status = 401, description = "Missing or invalid access token"),
+        (status = 403, description = "Role not allowed for this operation"),
+        (status = 422, description = "Field validation failed"),
+        (status = 503, description = "Database unavailable"),
     ),
     security(
         ("accessToken" = []),

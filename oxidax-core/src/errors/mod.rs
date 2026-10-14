@@ -5,34 +5,15 @@
 //! JSON response with structured logging. DTO validation errors handled by
 //! the extractors in `crate` share the same [`ErrorResponse`] body.
 
+pub mod examples;
 pub mod pipeline;
 pub mod response;
 
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use utoipa::openapi::RefOr;
-use utoipa::openapi::schema::{Ref, Schema};
-use utoipa::{PartialSchema, ToSchema};
 
+pub use examples::ErrorExamples;
 pub use response::ErrorResponse;
-
-/// OpenAPI alias of the `400 Bad Request` responses of the write methods:
-/// whatever the source (malformed body/query from the validation extractors or
-/// an application error such as a missing category), the body has the same
-/// [`ErrorResponse`] shape. It exists only for documentation, not at runtime.
-pub struct BadRequestResponse {}
-
-impl PartialSchema for BadRequestResponse {
-    fn schema() -> RefOr<Schema> {
-        Ref::from_schema_name("ErrorResponse").into()
-    }
-}
-
-impl ToSchema for BadRequestResponse {
-    fn schemas(schemas: &mut Vec<(String, RefOr<Schema>)>) {
-        schemas.push((Self::name().into_owned(), Self::schema()));
-    }
-}
 
 /// Generic application error, independent from the layer that produces it.
 #[derive(Debug, thiserror::Error)]
