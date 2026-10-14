@@ -23,8 +23,7 @@ use crate::cors;
 use crate::docs;
 use crate::errors::{AppError, AppResult, pipeline};
 use crate::middlewares::access_log::access_log;
-use crate::registry::{Feature, Route};
-use crate::upload::{UploadConfig, Uploader};
+use crate::registry::Feature;use crate::upload::{UploadConfig, Uploader};
 
 /// Metadata of the generated OpenAPI document.
 #[derive(Debug, Clone, Copy)]
@@ -83,15 +82,18 @@ pub fn assemble(
 
     let provider = services.build_provider().map_err(di_error)?;
 
-    let bundles = route_bundles(&provider);
+    let bundles = crate::registry::Route::bundles(&provider);
     let (routers, route_apis): (Vec<_>, Vec<_>) = bundles.into_iter().unzip();
 
-    let api = docs::build(route_apis, info);
     let mut router = Router::new().route("/api/health", get(health));
     for route in routers {
         router = router.merge(route);
     }
-    router = router.merge(docs::router(api));
+    if config.openapi_doc {
+        let api = docs::build(route_apis, info);
+        router = router.merge(docs::router(api));
+    }
+
 
     // The upload middleware and the body-size limit wrap the routes: the
     // `Upload` extractor resolves the shared `Uploader` from the request
@@ -122,13 +124,6 @@ fn registered() -> Vec<&'static Feature> {
     features
 }
 
-/// Builds the axum router and OpenAPI fragment of every self-registered
-/// route, resolving the services from the DI provider.
-fn route_bundles(provider: &ServiceProvider) -> Vec<(Router, OpenApi)> {
-    inventory::iter::<Route>()
-        .map(|route| (route.build)(provider))
-        .collect()
-}
 
 fn di_error(err: impl std::fmt::Display) -> AppError {
     AppError::Internal(format!("dependency injection: {err}"))

@@ -111,10 +111,11 @@ ADD-FEATURE.md          # English step-by-step guide to add a feature (example: 
   `State<Arc<T>>` argument (from which it derives `T`).
 - **Absolute** paths (`/api/...`) declared in `#[utoipa::path]`: no `nest`.
 - `oxidax_core::app::assemble` builds the provider, merges the route bundles,
-  mounts `/api/health`, the Scalar API reference and the fallback, and applies
-  `access_log` as the outermost layer.
+  mounts `/api/health`, the Scalar API reference and the fallback (if
+  `OPENAPI_DOC=true`), and applies `access_log` as the outermost layer.
 - No `docs/openapi.json` export: the spec is served live at
-  `/api-docs/openapi.json`, UI at `/scalar`.
+  `/api-docs/openapi.json`, UI at `/scalar` (only when `OPENAPI_DOC=true`).
+  Static spec can be generated with `cargo xtask openapi`.
 
 ### Dependency injection
 - Static registries in `oxidax-core/src/registry.rs`: `Feature { order, register:

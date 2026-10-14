@@ -37,6 +37,9 @@ pub struct Config {
     /// Optional allow-list of file extensions (without the dot). When empty,
     /// every extension is accepted.
     pub upload_allowed_extensions: Vec<String>,
+    /// Serve `/scalar` and `/api-docs/openapi.json` when true (`OPENAPI_DOC`,
+    /// default true). Set to `false` in production.
+    pub openapi_doc: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -50,6 +53,7 @@ impl Config {
     pub fn memory() -> Self {
         Self {
             db_backend: DbBackend::Memory,
+            openapi_doc: true,
             ..Self::from_env()
         }
     }
@@ -88,7 +92,21 @@ impl Config {
                 DEFAULT_UPLOAD_MAX_FILE_SIZE * DEFAULT_UPLOAD_MAX_FILES as u64,
             ),
             upload_allowed_extensions: optional_list("UPLOAD_ALLOWED_EXTENSIONS"),
+            openapi_doc: optional_bool("OPENAPI_DOC", true),
         }
+    }
+}
+
+/// Reads an optional boolean variable, falling back to `default` when unset.
+/// A present but unparsable value is a configuration error and panics.
+fn optional_bool(key: &str, default: bool) -> bool {
+    match optional(key) {
+        Some(raw) => match raw.trim().to_ascii_lowercase().as_str() {
+            "1" | "true" | "yes" | "on" => true,
+            "0" | "false" | "no" | "off" => false,
+            other => panic!("environment variable `{key}` must be a boolean (got `{other}`)"),
+        },
+        None => default,
     }
 }
 

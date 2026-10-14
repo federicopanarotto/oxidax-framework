@@ -183,6 +183,7 @@ test.
 
 ```bash
 cargo new-feature      # alias for: cargo xtask new-feature
+cargo openapi          # alias for: cargo xtask openapi
 ```
 
 ## Features
@@ -194,9 +195,12 @@ cargo new-feature      # alias for: cargo xtask new-feature
   OpenAPI paths point at `oxidax-core`.
 - `oxidax_core::app::assemble` builds the dependency-injection provider, merges
   the collected route bundles, mounts `/api/health`, the Scalar API reference and
-  the 404 fallback, and applies the access log as the outermost layer.
+  the 404 fallback, and applies the access log as the outermost layer. The OpenAPI
+  routes (`/api-docs/openapi.json` and `/scalar`) are served only when
+  `OPENAPI_DOC=true` (default in development; set `OPENAPI_DOC=false` in production).
 - There is no exported `openapi.json`: the specification is served live at
-  `/api-docs/openapi.json` and the Scalar UI at `/scalar`.
+  `/api-docs/openapi.json` and the Scalar UI at `/scalar` (when enabled), or can be
+  generated statically with `cargo xtask openapi`.
 - **Automatic error examples**: `oxidax_core::errors::ErrorExamples` walks the merged
   OpenAPI tree after collecting all feature paths and injects, for each documented
   error status (`400,401,403,404,409,413,415,422,500,503`), the shared
@@ -336,7 +340,7 @@ cp .env.example .env   # template with all required variables
 (seconds) and `ASSETS_DIR` (root directory for uploaded files, created at
 startup). If any is missing, startup fails with an explicit message.
 
-**Optional upload variables:** `UPLOAD_MAX_FILE_SIZE` (bytes, default 10 MiB),
+**Optional variables:** `OPENAPI_DOC` (boolean, default `true`; set to `false` in production to disable `/scalar` and `/api-docs/openapi.json`), `UPLOAD_MAX_FILE_SIZE` (bytes, default 10 MiB),
 `UPLOAD_MAX_FILES` (default 10), `UPLOAD_MAX_BODY_SIZE` (bytes, default
 `UPLOAD_MAX_FILE_SIZE × UPLOAD_MAX_FILES`) and `UPLOAD_ALLOWED_EXTENSIONS`
 (comma-separated allow-list without the dot; empty means any extension).
@@ -442,7 +446,7 @@ been implemented and what is planned.
 - [x] **CORS** with a configurable regex origin allow-list
 - [x] Multer-style **file upload** middleware with streaming, limits and filters
 - [x] Example features: `categories`, `places`, `users`, `reports`, `auth`, `uploads`
-- [x] Interactive **code generator** (`cargo xtask new-feature`)
+- [x] Interactive **code generator** (`cargo xtask new-feature`) and **OpenAPI exporter** (`cargo xtask openapi`)
 - [x] Production **Docker** image and compose stack
 - [x] **52** end-to-end HTTP integration tests on `mem://`
 

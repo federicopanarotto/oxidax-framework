@@ -6,6 +6,7 @@ dev-check = "watch --poll -x check"
 # `cargo run --quiet --package oxidax-cli -- <task>` (see oxidax-cli/).
 xtask = "run --quiet --package oxidax-cli --"
 new-feature = "run --quiet --package oxidax-cli -- new-feature"
+openapi = "run --quiet --package oxidax-cli -- openapi"
 
 # Docker shortcuts: build the image, save the tar and start/stop the production
 # stack in docker/prod.

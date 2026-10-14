@@ -55,7 +55,9 @@ async fn main() {
 
     // Announce the reachable endpoints: the API base and the Scalar API reference.
     tracing::info!("listening on http://{}", config.server_addr);
-    tracing::info!("API reference at http://{}/scalar", config.server_addr);
+    if config.openapi_doc {
+        tracing::info!("API reference at http://{}/scalar", config.server_addr);
+    }
 
     // Serve the application on the listener until the process is stopped. This
     // await never returns under normal operation (only on a fatal error).

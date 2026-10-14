@@ -9,6 +9,7 @@
 use std::process::{Command, ExitCode};
 
 mod generate;
+mod openapi;
 
 const IMAGE: &str = "oxidax:latest";
 const DOCKERFILE: &str = "docker/prod/Dockerfile";
@@ -23,6 +24,7 @@ fn main() -> ExitCode {
             ExitCode::SUCCESS
         }
         Some("new-feature") => generate::new_feature(),
+        Some("openapi") => openapi::generate(),
         Some("docker-build") => run("docker", &["build", "-t", IMAGE, "-f", DOCKERFILE, "."]),
         Some("docker-save") => save_tar(),
         Some("docker-package") => {
@@ -92,6 +94,7 @@ fn print_usage() {
          Usage: cargo xtask <task>\n\n\
          Tasks:\n\
          \x20 new-feature     interactive generator of a new CRUD feature\n\
+         \x20 openapi         generate openapi.json in the repository root\n\
          \x20 docker-build    cargo build --release && docker build docker/prod/Dockerfile\n\
          \x20 docker-save     save the built image to docker/oxidax.tar\n\
          \x20 docker-package  docker-build + docker-save\n\
