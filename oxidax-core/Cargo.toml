@@ -13,7 +13,6 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 utoipa = { version = "6", features = ["axum_extras", "uuid", "preserve_order"] }
 utoipa-axum = "0.3"
-utoipa-swagger-ui = { version = "10", features = ["axum"] }
 inventory = "0.3.25"
 surrealdb = { version = "3.3.1", features = ["kv-mem"] }
 uuid = { version = "1.23.0", features = ["v4", "serde"] }

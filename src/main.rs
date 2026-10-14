@@ -39,9 +39,9 @@ async fn main() {
     // Build the whole application: connects to the database backend, assembles
     // the dependency-injection provider from the registered features, collects
     // the routes self-registered by the `#[route]` macro (via `inventory`),
-    // merges them with the OpenAPI spec/Swagger UI and installs the fallback
-    // handler. Everything is discovered automatically: this call does not need
-    // to change when a new feature is added.
+    // merges them with the OpenAPI spec/Scalar API reference and installs the
+    // fallback handler. Everything is discovered automatically: this call does
+    // not need to change when a new feature is added.
     let app = app::build(&config)
         .await
         .expect("failed to start the application");
@@ -53,9 +53,9 @@ async fn main() {
         .await
         .expect("failed to bind the server to the configured address");
 
-    // Announce the reachable endpoints: the API base and the Swagger UI.
+    // Announce the reachable endpoints: the API base and the Scalar API reference.
     tracing::info!("listening on http://{}", config.server_addr);
-    tracing::info!("swagger UI at http://{}/swagger-ui", config.server_addr);
+    tracing::info!("API reference at http://{}/scalar", config.server_addr);
 
     // Serve the application on the listener until the process is stopped. This
     // await never returns under normal operation (only on a fatal error).

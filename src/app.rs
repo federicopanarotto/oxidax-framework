@@ -13,8 +13,8 @@ use crate::config::Config;
 use crate::db;
 use crate::errors::AppResult;
 
-/// Builds the application router (fully assembled: DI, routes, Swagger UI,
-/// health endpoint, fallback and access log).
+/// Builds the application router (fully assembled: DI, routes, Scalar API
+/// reference, health endpoint, fallback and access log).
 pub async fn build(config: &Config) -> AppResult<Router> {
     Ok(build_with_provider(config).await?.0)
 }

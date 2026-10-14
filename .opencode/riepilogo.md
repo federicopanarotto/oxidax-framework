@@ -38,7 +38,7 @@ keeps using `crate::lib::...`, `crate::framework::...`, `crate::errors::...`,
 | Building block | Choice                                                     |
 | -------------- | ---------------------------------------------------------- |
 | HTTP/route     | `axum 0.8` (+ `tower`)                                     |
-| OpenAPI/UI     | `utoipa 6` + `utoipa-axum 0.3` + `utoipa-swagger-ui 10`    |
+| OpenAPI/UI     | `utoipa 6` + `utoipa-axum 0.3` + Scalar (CDN)             |
 | Routes         | own `#[route]` proc-macro (`oxidax-macro/`) + `inventory`  |
 | Validation     | `validator 0.21` (derive)                                  |
 | DI             | `more-di 3` (feature `async` → `Ref<T> = Arc<T>`)          |
@@ -49,8 +49,10 @@ keeps using `crate::lib::...`, `crate::framework::...`, `crate::errors::...`,
 | Upload         | axum `multipart` (i.e. `multer`) + `tokio` (fs/io-util) + `tokio-util` (ReaderStream) |
 | Config         | `dotenvy 0.15` + environment variables                     |
 
-The app dropped `utoipa-swagger-ui`, `jsonwebtoken`, `argon2` (they now live in
-`oxidax-core`). The app keeps `utoipa-axum`, `inventory`, `more-di` because the
+The app dropped `jsonwebtoken`, `argon2` (they now live in `oxidax-core`). The
+UI crate `utoipa-swagger-ui` was removed in favour of [Scalar](https://scalar.com)
+(a CDN script loaded by an HTML endpoint). The app keeps `utoipa-axum`,
+`inventory`, `more-di` because the
 macro-generated code refers to them by name (`utoipa_axum`, `inventory`, `di`).
 
 ## Layout
@@ -60,7 +62,7 @@ oxidax-core/src/
 ├── lib.rs             # modules: app, auth, config, db, docs, errors, framework,
 │                      #   middlewares, pagination, registry, validators + pub use validator::Validate
 ├── app.rs             # assemble(config, AppInfo, register_repositories) → (Router, ServiceProvider)
-├── docs.rs            # ApiDoc (security scheme accessToken) + build + swagger_router
+├── docs.rs            # ApiDoc (security scheme accessToken) + build + Scalar router
 ├── config.rs          # Config::from_env() (env/.env, no default) + Config::memory()
 ├── framework.rs       # facade for features: `use crate::framework::*` + `pub use oxidax_macro::route`
 ├── registry.rs        # static Feature (DI) and Route registries + register_repository
@@ -109,10 +111,10 @@ ADD-FEATURE.md          # English step-by-step guide to add a feature (example: 
   `State<Arc<T>>` argument (from which it derives `T`).
 - **Absolute** paths (`/api/...`) declared in `#[utoipa::path]`: no `nest`.
 - `oxidax_core::app::assemble` builds the provider, merges the route bundles,
-  mounts `/api/health`, the Swagger UI and the fallback, and applies `access_log`
-  as the outermost layer.
+  mounts `/api/health`, the Scalar API reference and the fallback, and applies
+  `access_log` as the outermost layer.
 - No `docs/openapi.json` export: the spec is served live at
-  `/api-docs/openapi.json`, UI at `/swagger-ui`.
+  `/api-docs/openapi.json`, UI at `/scalar`.
 
 ### Dependency injection
 - Static registries in `oxidax-core/src/registry.rs`: `Feature { order, register:
@@ -160,7 +162,7 @@ validation extractor's `ErrorResponse`.
   `401 invalid or expired refresh token`.
 - Register spans 2 tables non-transactionally → manual compensation (removes the
   user if the identity fails, `tracing::warn` if the rollback fails).
-- Swagger: scheme `accessToken` (`utoipa::Modify` in `oxidax-core/src/docs.rs`,
+- OpenAPI security: scheme `accessToken` (`utoipa::Modify` in `oxidax-core/src/docs.rs`,
   HTTP bearer JWT); each protected handler declares `security(...)` and 401/403.
   (The auth refresh handler references `refreshToken`, but only `accessToken` is
   currently declared in the spec — a known gap.)
@@ -342,7 +344,7 @@ Aliases (`.cargo/config.toml`): `cargo dev`, `cargo dev-check`, `cargo xtask
 <task>`, `cargo new-feature`, `cargo docker-{build,save,package,run,stop}`.
 
 Run locally: `cp .env.example .env`; then `DB_BACKEND=memory cargo run` (no Surreal)
-or `cargo run` (SurrealDB from `.env`). UI: http://localhost:3000/swagger-ui.
+or `cargo run` (SurrealDB from `.env`). UI: http://localhost:3000/scalar.
 
 ## Gotchas
 

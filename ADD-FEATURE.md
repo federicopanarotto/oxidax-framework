@@ -296,7 +296,7 @@ Key points:
   `oxidax-core`): it rejects empty or whitespace-only strings.
 - `into_entity` normalizes (`.trim()`) and generates the `id`, so the service
   receives ready-made data.
-- `ToSchema` makes the DTO visible in Swagger.
+- `ToSchema` makes the DTO visible in the API reference.
 
 ---
 
@@ -723,7 +723,7 @@ Key points:
 - `Path(id): Path<String>` for route params; `ValidatedJson` for the body.
 - The imports come from the **facade** `crate::framework` (extractors, `route`,
   error types), so all feature controllers are uniform.
-- The `tag` groups the endpoints in Swagger UI.
+- The `tag` groups the endpoints in the Scalar API reference.
 
 ---
 
@@ -1317,7 +1317,7 @@ cargo test --workspace
 ```
 
 Then start the project and open the documentation: the new `places` endpoints are
-already in Swagger UI at `http://localhost:3000/swagger-ui` (spec at
+already in the Scalar API reference at `http://localhost:3000/scalar` (spec at
 `/api-docs/openapi.json`), **without having touched** the generic assembly in
 `oxidax-core`.
 

@@ -3,8 +3,8 @@
 //! Generic glue shared by every project. The application calls [`assemble`]
 //! with the [`Config`], its OpenAPI metadata and a closure that registers the
 //! concrete repositories; everything else (config injection, feature services,
-//! self-registered routes, Swagger UI, health endpoint, fallback and access
-//! log) is handled here.
+//! self-registered routes, Scalar API reference, health endpoint, fallback and
+//! access log) is handled here.
 
 use std::sync::Arc;
 
@@ -29,7 +29,7 @@ use crate::upload::{UploadConfig, Uploader};
 /// Metadata of the generated OpenAPI document.
 #[derive(Debug, Clone, Copy)]
 pub struct AppInfo<'a> {
-    /// Title shown in the Swagger UI and in the OpenAPI `info` block.
+    /// Title shown in the Scalar API reference and in the OpenAPI `info` block.
     pub title: &'a str,
     /// Version shown in the OpenAPI `info` block.
     pub version: &'a str,
@@ -91,7 +91,7 @@ pub fn assemble(
     for route in routers {
         router = router.merge(route);
     }
-    router = router.merge(docs::swagger_router(api));
+    router = router.merge(docs::router(api));
 
     // The upload middleware and the body-size limit wrap the routes: the
     // `Upload` extractor resolves the shared `Uploader` from the request

@@ -3,7 +3,7 @@
 //! Logs every incoming HTTP request as a single compact line, e.g.
 //! `POST /api/reports 201 3ms`. It is installed outermost on the router so it
 //! wraps *all* requests, including unmatched routes (the fallback handler) and
-//! the Swagger UI.
+//! the Scalar API reference.
 
 use std::time::Instant;
 

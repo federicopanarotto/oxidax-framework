@@ -3,7 +3,7 @@ set -e
 BASE=http://localhost:3000
 
 echo "health: $(curl -s $BASE/health)"
-echo "swagger-ui: $(curl -s -o /dev/null -w '%{http_code}' $BASE/swagger-ui/)"
+echo "scalar: $(curl -s -o /dev/null -w '%{http_code}' $BASE/scalar)"
 
 CREATED=$(curl -s -X POST $BASE/api/reports \
   -H 'content-type: application/json' \

@@ -1,4 +1,4 @@
-//! Health, Swagger UI and OpenAPI specification.
+//! Health, Scalar API reference and OpenAPI specification.
 
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
@@ -7,7 +7,7 @@ use tower::ServiceExt;
 use crate::support::{app, json_body};
 
 #[tokio::test]
-async fn swagger_and_health_are_available() {
+async fn scalar_and_health_are_available() {
     let app = app().await;
 
     let response = app
@@ -26,7 +26,7 @@ async fn swagger_and_health_are_available() {
         .clone()
         .oneshot(
             Request::builder()
-                .uri("/swagger-ui/")
+                .uri("/scalar")
                 .body(Body::empty())
                 .unwrap(),
         )

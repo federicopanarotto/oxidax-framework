@@ -78,7 +78,7 @@ application's `src/` limited to application code.
 | Building block      | Crate(s)                                                             | Rationale                                                    |
 | ------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------ |
 | HTTP / routing      | [axum](https://github.com/tokio-rs/axum)                             | performant, macro-free, part of the tower ecosystem          |
-| OpenAPI / UI        | [utoipa](https://github.com/juhaku/utoipa) + `utoipa-axum` + `utoipa-swagger-ui` | `#[utoipa::path]` decorators and a ready-made Swagger UI |
+| OpenAPI / UI        | [utoipa](https://github.com/juhaku/utoipa) + `utoipa-axum` + [Scalar](https://scalar.com) | `#[utoipa::path]` decorators and a ready-made API reference UI |
 | Route discovery     | `oxidax-macro` (`#[route]`) + [inventory](https://github.com/dtolnay/inventory) | compile-time static route registration            |
 | Validation          | [validator](https://github.com/Keats/validator)                      | mature validation decorators                                 |
 | Dependency injection| [more-di](https://github.com/AndyShi-more/MoreDi)                    | lazy injection with a `ServiceProvider`                      |
@@ -93,7 +93,7 @@ application's `src/` limited to application code.
 ```
 oxidax-core/                  # reusable framework library
 ├── src/
-│   ├── app.rs                # generic assembly: DI provider + router + Swagger UI
+│   ├── app.rs                # generic assembly: DI provider + router + Scalar API reference
 │   ├── docs.rs               # OpenAPI base document (security schemes)
 │   ├── config.rs             # configuration from the environment
 │   ├── errors/               # error contract + HTTP pipeline
@@ -193,10 +193,10 @@ cargo new-feature      # alias for: cargo xtask new-feature
   handler plus a compile-time registration (`inventory::submit!`). The generated
   OpenAPI paths point at `oxidax-core`.
 - `oxidax_core::app::assemble` builds the dependency-injection provider, merges
-  the collected route bundles, mounts `/api/health`, the Swagger UI and the 404
-  fallback, and applies the access log as the outermost layer.
+  the collected route bundles, mounts `/api/health`, the Scalar API reference and
+  the 404 fallback, and applies the access log as the outermost layer.
 - There is no exported `openapi.json`: the specification is served live at
-  `/api-docs/openapi.json` and the UI at `/swagger-ui`.
+  `/api-docs/openapi.json` and the Scalar UI at `/scalar`.
 
 ### Validation and response contract
 
@@ -426,7 +426,7 @@ been implemented and what is planned.
 
 - [x] **Zero-touch routing** — `#[route]` proc-macro + `inventory` static registries
 - [x] **Dependency injection** — `more-di`, with per-feature service registration and centralized repository wiring
-- [x] OpenAPI document and **live Swagger UI** generated from decorators (`/swagger-ui`)
+- [x] OpenAPI document and **live Scalar API reference** generated from decorators (`/scalar`)
 - [x] Declarative **validation** on body/query/params with `422 validation_error`
 - [x] **Unified error contract** `{code, error, message}` for domain, pipeline and validation errors
 - [x] JWT **authentication** (HS256): access token + single-use rotating refresh token, Argon2id passwords
