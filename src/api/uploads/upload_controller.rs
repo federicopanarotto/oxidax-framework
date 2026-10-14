@@ -17,7 +17,7 @@ use crate::framework::{CurrentUser, PaginationQuery, Upload, ValidatedQuery, rou
 #[route]
 #[utoipa::path(
     get,
-    path = "/api/upload",
+    path = "/api/uploads",
     tag = "uploads",
     params(
         ("page" = Option<u64>, Query, description = "Page number, 1-based (default 1)", example = 1),
@@ -40,7 +40,7 @@ pub async fn list_uploaded_files(
 #[route]
 #[utoipa::path(
     post,
-    path = "/api/upload",
+    path = "/api/uploads",
     tag = "uploads",
     request_body(content = UploadForm, content_type = "multipart/form-data"),
     responses(
@@ -68,7 +68,7 @@ pub async fn upload_file(
 #[route]
 #[utoipa::path(
     get,
-    path = "/api/upload/{id}",
+    path = "/api/uploads/{id}",
     tag = "uploads",
     params(("id" = String, Path, description = "Asset id")),
     responses(
@@ -88,7 +88,7 @@ pub async fn download_file(
 #[route]
 #[utoipa::path(
     delete,
-    path = "/api/upload/{id}",
+    path = "/api/uploads/{id}",
     tag = "uploads",
     params(("id" = String, Path, description = "Asset id")),
     responses(
