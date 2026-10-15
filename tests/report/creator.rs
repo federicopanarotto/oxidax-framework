@@ -88,22 +88,22 @@ async fn report_stores_and_returns_the_creator() {
     assert_eq!(status, StatusCode::CREATED, "{created}");
     // The relation id is never exposed, only the nested object.
     assert!(created.get("user_id").is_none(), "{created}");
-    assert_eq!(created["created_by"]["id"], user_id.as_str());
-    assert_eq!(created["created_by"]["firstname"], "Mario");
+    assert_eq!(created["createdBy"]["id"], user_id.as_str());
+    assert_eq!(created["createdBy"]["firstname"], "Mario");
     // The email of the creator never appears in the response: only the profile.
-    assert!(created["created_by"].get("email").is_none(), "{created}");
+    assert!(created["createdBy"].get("email").is_none(), "{created}");
 
     let report_id = created["id"].as_str().expect("id report").to_string();
 
     let (status, fetched) = get(&app, &format!("/api/reports/{report_id}")).await;
     assert_eq!(status, StatusCode::OK, "{fetched}");
-    assert_eq!(fetched["created_by"]["id"], user_id.as_str());
+    assert_eq!(fetched["createdBy"]["id"], user_id.as_str());
 
     let (status, list) = get(&app, "/api/reports").await;
     assert_eq!(status, StatusCode::OK, "{list}");
     let list = list.as_array().expect("lista di report");
     assert_eq!(list.len(), 1);
-    assert_eq!(list[0]["created_by"]["id"], user_id.as_str());
+    assert_eq!(list[0]["createdBy"]["id"], user_id.as_str());
 }
 
 #[tokio::test]
@@ -129,5 +129,5 @@ async fn update_preserves_the_creator() {
     let updated = json_body(response).await;
     assert_eq!(status, StatusCode::OK, "{updated}");
     assert_eq!(updated["name"], "Aggiornato");
-    assert_eq!(updated["created_by"]["id"], user_id.as_str());
+    assert_eq!(updated["createdBy"]["id"], user_id.as_str());
 }

@@ -5,21 +5,23 @@ use axum::http::{Request, StatusCode};
 use serde_json::json;
 use tower::ServiceExt;
 
-use crate::support::{app, json_body, json_request};
+use crate::support::{app, authorized_json_request, json_body, mint_access_token};
 
 #[tokio::test]
 async fn color_full_crud_cycle() {
     let app = app().await;
+    let token = mint_access_token("550e8400-e29b-41d4-a716-446655440000").await;
 
     let response = app
         .clone()
-        .oneshot(json_request(
+        .oneshot(authorized_json_request(
             "POST",
             "/api/color",
             json!({
             "name": "sample",
             "hex": "sample",
             }),
+            &token,
         ))
         .await
         .unwrap();
@@ -65,13 +67,14 @@ async fn color_full_crud_cycle() {
 
     let response = app
         .clone()
-        .oneshot(json_request(
+        .oneshot(authorized_json_request(
             "PUT",
             &format!("/api/color/{id}"),
             json!({
             "name": "sample",
             "hex": "sample",
             }),
+            &token,
         ))
         .await
         .unwrap();
@@ -83,6 +86,7 @@ async fn color_full_crud_cycle() {
             Request::builder()
                 .method("DELETE")
                 .uri(format!("/api/color/{id}"))
+                .header("authorization", format!("Bearer {token}"))
                 .body(Body::empty())
                 .unwrap(),
         )

@@ -5,7 +5,8 @@ use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::Response;
 
-use crate::api::color::color_dto::{ColorResponse, CreateColorDto, UpdateColorDto};
+use crate::api::color::color_dto::{CreateColorDto, UpdateColorDto};
+use crate::api::color::color_response::ColorResponse;
 use crate::api::color::color_service::ColorService;
 use crate::errors::AppResult;
 use crate::framework::{PaginationQuery, ValidatedJson, ValidatedQuery, route};
@@ -50,6 +51,7 @@ pub async fn list_colors(
         (status = 503, description = "Database unavailable"),
     ),
 )]
+#[IsGranted]
 pub async fn create_color(
     State(service): State<Arc<ColorService>>,
     ValidatedJson(dto): ValidatedJson<CreateColorDto>,
@@ -92,6 +94,7 @@ pub async fn get_color(
         (status = 503, description = "Database unavailable"),
     ),
 )]
+#[IsGranted]
 pub async fn update_color(
     State(service): State<Arc<ColorService>>,
     Path(id): Path<String>,
@@ -112,6 +115,7 @@ pub async fn update_color(
         (status = 503, description = "Database unavailable"),
     ),
 )]
+#[IsGranted]
 pub async fn delete_color(
     State(service): State<Arc<ColorService>>,
     Path(id): Path<String>,

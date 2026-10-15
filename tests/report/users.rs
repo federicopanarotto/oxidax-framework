@@ -59,9 +59,9 @@ async fn login(app: &Router, email: &str, password: &str) -> String {
     let status = response.status();
     let body = json_body(response).await;
     assert_eq!(status, StatusCode::OK, "{body}");
-    body["access_token"]
+    body["accessToken"]
         .as_str()
-        .expect("access_token")
+        .expect("accessToken")
         .to_string()
 }
 

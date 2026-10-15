@@ -122,34 +122,3 @@ impl UpdatePlaceDto {
         }
     }
 }
-
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct PlaceResponse {
-    /// UUID identifier of the place
-    #[schema(example = "550e8400-e29b-41d4-a716-446655440000")]
-    pub id: String,
-    /// City name
-    #[schema(example = "Milano")]
-    pub city: String,
-    /// Street address
-    #[schema(example = "Via Roma 1")]
-    pub address: String,
-    /// Postal code
-    #[schema(example = "20100")]
-    pub cap: String,
-    /// Provenance
-    #[schema(example = "Comune di Milano")]
-    pub provenance: String,
-}
-
-impl From<crate::api::places::place_entity::Place> for PlaceResponse {
-    fn from(place: crate::api::places::place_entity::Place) -> Self {
-        Self {
-            id: place.id,
-            city: place.city,
-            address: place.address,
-            cap: place.cap,
-            provenance: place.provenance,
-        }
-    }
-}

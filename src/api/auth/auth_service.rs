@@ -8,6 +8,7 @@ use crate::api::auth::auth_dto::{
 };
 use crate::api::users::user_entity::{ROLE_USER, User};
 use crate::api::users::user_repository::UserRepository;
+use crate::api::users::user_response::UserSummaryResponse;
 use crate::errors::{AppError, AppResult};
 use crate::framework::CurrentUser;
 use crate::lib::auth::{AuthProvider, JwtConfig, UserIdentity, UserIdentityRepository, password};
@@ -72,7 +73,7 @@ impl AuthService {
         if let Err(err) = self.identities.insert(identity).await {
             // Compensating action: the two writes are not transactional yet,
             // so a failed identity must not leave an orphan user behind.
-            if let Err(rollback) = self.users.remove(&user.id).await {
+            if let Err(rollback) = self.users.delete(&user.id).await {
                 tracing::warn!(
                     user_id = %user.id,
                     error = %rollback,
@@ -99,7 +100,7 @@ impl AuthService {
             return Err(unauthorized(INVALID_CREDENTIALS));
         }
 
-        let Some(user) = self.users.find_by_id(&identity.user_id).await? else {
+        let Some(user) = self.users.find(&identity.user_id).await? else {
             return Err(unauthorized(INVALID_CREDENTIALS));
         };
 
@@ -128,7 +129,7 @@ impl AuthService {
 
         let user = self
             .users
-            .find_by_id(&identity.user_id)
+            .find(&identity.user_id)
             .await?
             .ok_or_else(|| unauthorized(INVALID_REFRESH))?;
 
@@ -147,7 +148,7 @@ impl AuthService {
     /// applies from the next login/refresh.
     async fn issue_session(
         &self,
-        user: &User,
+        user: &UserSummaryResponse,
         identity: &UserIdentity,
     ) -> AppResult<TokenResponse> {
         let jti = Uuid::new_v4().to_string();

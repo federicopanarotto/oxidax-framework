@@ -15,7 +15,10 @@ use proc_macro::TokenStream;
 use quote::{format_ident, quote};
 use syn::parse_macro_input;
 use syn::spanned::Spanned;
-use syn::{Expr, ExprLit, FnArg, GenericArgument, ItemFn, Lit, Meta, PathArguments, Type};
+use syn::{
+    Attribute, Data, DeriveInput, Expr, ExprLit, Fields, FnArg, GenericArgument, ItemFn, Lit,
+    LitStr, Meta, Path, PathArguments, Type,
+};
 
 /// Registers an axum handler as a route and in the OpenAPI spec.
 ///
@@ -133,6 +136,340 @@ pub fn route(_attr: TokenStream, item: TokenStream) -> TokenStream {
     };
 
     expanded.into()
+}
+
+/// Derives [`oxidax_core::response::Response`] for a read-model struct.
+///
+/// The response declares the table it is read from and, for every relation, the
+/// foreign-key column and the target table. The macro generates the SurrealQL
+/// projection that resolves the whole object graph in a single
+/// `SELECT VALUE { ... }` query (no N+1):
+///
+/// ```ignore
+/// #[derive(Response)]
+/// #[response(entity = Report, table = "report")]
+/// pub struct ReportResponse {
+///     pub id: String,          // -> `id: record::id(id)`
+///     pub name: String,        // -> `name: name`
+///     #[response(relation = "category_id", table = "category")]
+///     pub category: Option<CategoryResponse>, // nested projection
+/// }
+/// ```
+///
+/// Scalars are copied from the entity field with the same name; relation fields
+/// are `None` after `From<Entity>` (they are only filled by the database read).
+///
+/// The response decides the shape, field by field:
+/// - a plain field is projected with the same name (`name: name`);
+/// - `#[response(field = "source")]` projects from a different entity field
+///   (e.g. expose the creator id as `created_by` from `user_id`);
+/// - a relation (`#[response(relation = ...)]`) nests the whole related object;
+/// - `#[response(skip)]` keeps the Rust field but leaves it out of the
+///   projection (it serializes as its default).
+#[proc_macro_derive(Response, attributes(response))]
+pub fn derive_response(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    match expand_response(input) {
+        Ok(tokens) => tokens.into(),
+        Err(error) => error.to_compile_error().into(),
+    }
+}
+
+/// Struct-level `#[response(...)]`: the backing table and the optional entity
+/// used by the generated `From` impl.
+struct StructSpec {
+    table: String,
+    entity: Option<Path>,
+    rename: RenameRule,
+}
+
+/// Per-field `#[response(...)]`: a plain scalar, a relation or a skipped field.
+enum FieldSpec {
+    /// A scalar exposed under the response field name; `source` overrides the
+    /// entity field it is read from (`#[response(field = "...")]`).
+    Scalar {
+        source: Option<String>,
+    },
+    Relation {
+        foreign_key: String,
+        table: String,
+    },
+    Skip,
+}
+
+/// Casing rule applied to the projected keys, mirroring `#[serde(rename_all)]`
+/// so the keys returned by the database match what `serde` expects when the
+/// row is decoded back into the response struct.
+#[derive(Clone, Copy)]
+enum RenameRule {
+    Snake,
+    Camel,
+    Pascal,
+    ScreamingSnake,
+    Kebab,
+    ScreamingKebab,
+    Lower,
+    Upper,
+}
+
+impl RenameRule {
+    fn from_serde(value: &str) -> Option<Self> {
+        Some(match value {
+            "snake_case" => Self::Snake,
+            "camelCase" => Self::Camel,
+            "PascalCase" => Self::Pascal,
+            "SCREAMING_SNAKE_CASE" => Self::ScreamingSnake,
+            "kebab-case" => Self::Kebab,
+            "SCREAMING-KEBAB-CASE" => Self::ScreamingKebab,
+            "lowercase" => Self::Lower,
+            "UPPERCASE" => Self::Upper,
+            _ => return None,
+        })
+    }
+
+    fn apply(self, ident: &str) -> String {
+        match self {
+            Self::Snake => ident.to_string(),
+            Self::Camel => {
+                let mut parts = ident.split('_');
+                let mut out = parts.next().unwrap_or_default().to_lowercase();
+                for part in parts {
+                    out.push_str(&capitalize(part));
+                }
+                out
+            }
+            Self::Pascal => ident.split('_').map(capitalize).collect(),
+            Self::ScreamingSnake => ident.to_uppercase(),
+            Self::Kebab => ident.replace('_', "-"),
+            Self::ScreamingKebab => ident.to_uppercase().replace('_', "-"),
+            Self::Lower => ident.to_lowercase(),
+            Self::Upper => ident.to_uppercase(),
+        }
+    }
+}
+
+fn capitalize(part: &str) -> String {
+    let mut chars = part.chars();
+    match chars.next() {
+        Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+        None => String::new(),
+    }
+}
+
+fn expand_response(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
+    let ident = &input.ident;
+    let struct_spec = parse_struct_spec(&input.attrs)?;
+
+    let Data::Struct(data) = &input.data else {
+        return Err(syn::Error::new_spanned(
+            ident,
+            "#[derive(Response)] only supports structs",
+        ));
+    };
+    let Fields::Named(fields) = &data.fields else {
+        return Err(syn::Error::new_spanned(
+            ident,
+            "#[derive(Response)] requires named fields",
+        ));
+    };
+
+    let mut projection_steps = Vec::new();
+    let mut from_fields = Vec::new();
+
+    for field in &fields.named {
+        let name = field.ident.as_ref().expect("named field");
+        match parse_field_spec(&field.attrs)? {
+            FieldSpec::Scalar { source } => {
+                let source = source.unwrap_or_else(|| name.to_string());
+                let key = struct_spec.rename.apply(&name.to_string());
+                let entry = if source == "id" {
+                    format!("{key}: record::id(id)")
+                } else {
+                    format!("{key}: {source}")
+                };
+                projection_steps.push(quote! {
+                    parts.push(#entry.to_string());
+                });
+                let source = syn::Ident::new(&source, name.span());
+                from_fields.push(quote! { #name: entity.#source });
+            }
+
+            FieldSpec::Skip => {
+                from_fields.push(quote! { #name: Default::default() });
+            }
+            FieldSpec::Relation {
+                foreign_key,
+                table: target,
+            } => {
+                let inner = option_inner(&field.ty)?;
+                let display = struct_spec.rename.apply(&name.to_string());
+                projection_steps.push(quote! {
+                    parts.push(format!(
+                        "{}: type::record('{}', {}).{{ {} }}",
+                        #display,
+                        #target,
+                        #foreign_key,
+                        <#inner as ::oxidax_core::response::Response>::projection(),
+                    ));
+                });
+                from_fields.push(quote! { #name: None });
+            }
+        }
+    }
+
+    let field_names: Vec<_> = fields
+        .named
+        .iter()
+        .map(|field| field.ident.as_ref().expect("named field"))
+        .collect();
+
+    let table = &struct_spec.table;
+    let entity_impl = struct_spec.entity.as_ref().map(|entity| {
+        quote! {
+            impl From<#entity> for #ident {
+                fn from(entity: #entity) -> Self {
+                    Self { #(#from_fields),* }
+                }
+            }
+        }
+    });
+    let _ = &from_fields;
+
+    Ok(quote! {
+        impl ::oxidax_core::response::Response for #ident {
+            const TABLE: &'static str = #table;
+
+            fn projection() -> ::std::string::String {
+                let mut parts: ::std::vec::Vec<::std::string::String> =
+                    ::std::vec::Vec::new();
+                #(#projection_steps)*
+                parts.join(", ")
+            }
+        }
+
+        // Touch every field so the compiler never reports `dead_code` for a
+        // response field that is skipped from (de)serialization but still part
+        // of the read-model.
+        const _: () = {
+            #[allow(dead_code)]
+            fn __oxidax_read_fields(value: &#ident) {
+                let _ = (#(&value.#field_names),*);
+            }
+        };
+
+        #entity_impl
+    })
+}
+
+fn parse_struct_spec(attrs: &[Attribute]) -> syn::Result<StructSpec> {
+    let mut table = None;
+    let mut entity = None;
+    let mut rename = RenameRule::Snake;
+
+    for attr in attrs.iter().filter(|attr| attr.path().is_ident("response")) {
+        attr.parse_nested_meta(|meta| {
+            if meta.path.is_ident("entity") {
+                entity = Some(meta.value()?.parse()?);
+                Ok(())
+            } else if meta.path.is_ident("table") {
+                let value: LitStr = meta.value()?.parse()?;
+                table = Some(value.value());
+                Ok(())
+            } else {
+                Err(meta.error("unknown `#[response(...)]` argument"))
+            }
+        })?;
+    }
+
+    // Mirror `#[serde(rename_all = "...")]`: the projected keys must use the
+    // same casing as the JSON the struct is decoded from.
+    for attr in attrs.iter().filter(|attr| attr.path().is_ident("serde")) {
+        attr.parse_nested_meta(|meta| {
+            if meta.path.is_ident("rename_all") {
+                let value: LitStr = meta.value()?.parse()?;
+                if let Some(rule) = RenameRule::from_serde(&value.value()) {
+                    rename = rule;
+                }
+            }
+            Ok(())
+        })?;
+    }
+
+    let table = table.ok_or_else(|| {
+        syn::Error::new(
+            proc_macro2::Span::call_site(),
+            "missing `#[response(table = \"...\")]` on the response struct",
+        )
+    })?;
+
+    Ok(StructSpec {
+        table,
+        entity,
+        rename,
+    })
+}
+
+fn parse_field_spec(attrs: &[Attribute]) -> syn::Result<FieldSpec> {
+    let mut foreign_key = None;
+    let mut table = None;
+    let mut source = None;
+    let mut skip = false;
+
+    for attr in attrs.iter().filter(|attr| attr.path().is_ident("response")) {
+        attr.parse_nested_meta(|meta| {
+            if meta.path.is_ident("relation") {
+                let value: LitStr = meta.value()?.parse()?;
+                foreign_key = Some(value.value());
+                Ok(())
+            } else if meta.path.is_ident("table") {
+                let value: LitStr = meta.value()?.parse()?;
+                table = Some(value.value());
+                Ok(())
+            } else if meta.path.is_ident("field") {
+                let value: LitStr = meta.value()?.parse()?;
+                source = Some(value.value());
+                Ok(())
+            } else if meta.path.is_ident("skip") {
+                skip = true;
+                Ok(())
+            } else {
+                Err(meta.error("unknown `#[response(...)]` field attribute"))
+            }
+        })?;
+    }
+
+    if skip {
+        return Ok(FieldSpec::Skip);
+    }
+    match foreign_key {
+        Some(foreign_key) => {
+            let table = table.ok_or_else(|| {
+                syn::Error::new(
+                    proc_macro2::Span::call_site(),
+                    "a relation field needs `table = \"...\"` (the related table)",
+                )
+            })?;
+            Ok(FieldSpec::Relation { foreign_key, table })
+        }
+        None => Ok(FieldSpec::Scalar { source }),
+    }
+}
+
+/// Extracts `T` from an `Option<T>` field (relations are always optional).
+fn option_inner(ty: &Type) -> syn::Result<&Type> {
+    if let Type::Path(path) = ty
+        && let Some(segment) = path.path.segments.last()
+        && segment.ident == "Option"
+        && let PathArguments::AngleBracketed(arguments) = &segment.arguments
+        && let Some(GenericArgument::Type(inner)) = arguments.args.first()
+    {
+        return Ok(inner);
+    }
+    Err(syn::Error::new_spanned(
+        ty,
+        "a relation field must be `Option<T>` (it degrades to null when the \
+         relationship is broken)",
+    ))
 }
 
 /// The handler must be annotated with `#[utoipa::path(...)]` (or the imported

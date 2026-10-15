@@ -2,23 +2,16 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use surrealdb::Surreal;
 use surrealdb::engine::any::Any;
-use surrealdb::types::{RecordId, SurrealValue};
+use surrealdb::types::SurrealValue;
 
 use crate::api::users::user_entity::User;
 use crate::api::users::user_repository::UserRepository;
-use crate::db::{define_table, query, record_key_to_string};
-use crate::errors::{AppError, AppResult};
+use crate::api::users::user_response::UserSummaryResponse;
+use crate::db::{define_table, query};
+use crate::errors::AppResult;
+use crate::framework::ViewRepository;
 
 const TABLE: &str = "user";
-
-/// Row as it arrives from the database (the id is a SurrealDB record id).
-#[derive(Debug, Serialize, Deserialize, SurrealValue)]
-struct UserRow {
-    id: RecordId,
-    firstname: String,
-    lastname: String,
-    role: String,
-}
 
 /// Persistable content: the id is managed by the database, it must not be
 /// written in the CONTENT.
@@ -45,86 +38,27 @@ impl SurrealUserRepository {
     }
 }
 
-/// The API works with the record id key alone (`uuid`), not with `table:uuid`.
-fn into_entity(row: UserRow) -> User {
-    User {
-        id: record_key_to_string(row.id.key),
-        firstname: row.firstname,
-        lastname: row.lastname,
-        role: row.role,
-    }
-}
+/// Enables all the populated reads (`find`, `find_page`, `find_page_by`,
+/// `count`, `count_by`, `delete`) on top of the shared connection.
+#[async_trait]
+impl ViewRepository for SurrealUserRepository {
+    type Response = UserSummaryResponse;
 
-fn created_or_internal(user: User, created: Option<UserRow>) -> AppResult<User> {
-    if created.is_some() {
-        Ok(user)
-    } else {
-        Err(AppError::Internal(format!(
-            "failed to create user {}",
-            user.id
-        )))
+    fn db(&self) -> &Surreal<Any> {
+        &self.db
     }
 }
 
 #[async_trait]
 impl UserRepository for SurrealUserRepository {
-    async fn insert(&self, user: User) -> AppResult<User> {
+    async fn insert(&self, user: User) -> AppResult<UserSummaryResponse> {
+        let id = user.id.clone();
         let content = UserContent {
-            firstname: user.firstname.clone(),
-            lastname: user.lastname.clone(),
-            role: user.role.clone(),
+            firstname: user.firstname,
+            lastname: user.lastname,
+            role: user.role,
         };
 
-        let created: Option<UserRow> = self
-            .db
-            .create((TABLE, user.id.as_str()))
-            .content(content)
-            .await?;
-
-        created_or_internal(user, created)
-    }
-
-    async fn find_by_id(&self, id: &str) -> AppResult<Option<User>> {
-        let found: Option<UserRow> = self.db.select((TABLE, id)).await?;
-        Ok(found.map(into_entity))
-    }
-
-    async fn find_all(&self) -> AppResult<Vec<User>> {
-        let rows: Vec<UserRow> = self.db.select(TABLE).await?;
-        Ok(rows.into_iter().map(into_entity).collect())
-    }
-
-    async fn find_by_role(&self, role: &str) -> AppResult<Vec<User>> {
-        let mut result = self
-            .db
-            .query("SELECT * FROM user WHERE role = $value")
-            .bind(("value", role))
-            .await?;
-        let rows: Vec<UserRow> = result.take(0)?;
-        Ok(rows.into_iter().map(into_entity).collect())
-    }
-
-    async fn find_page(&self, offset: u64, limit: u64) -> AppResult<Vec<User>> {
-        let rows: Vec<UserRow> = query::select_page(&self.db, TABLE, offset, limit).await?;
-        Ok(rows.into_iter().map(into_entity).collect())
-    }
-
-    async fn find_page_by_role(&self, role: &str, offset: u64, limit: u64) -> AppResult<Vec<User>> {
-        let rows: Vec<UserRow> =
-            query::select_page_by(&self.db, TABLE, "role", role, offset, limit).await?;
-        Ok(rows.into_iter().map(into_entity).collect())
-    }
-
-    async fn count(&self) -> AppResult<u64> {
-        query::count(&self.db, TABLE).await
-    }
-
-    async fn count_by_role(&self, role: &str) -> AppResult<u64> {
-        query::count_by(&self.db, TABLE, "role", role).await
-    }
-
-    async fn remove(&self, id: &str) -> AppResult<bool> {
-        let deleted: Option<UserRow> = self.db.delete((TABLE, id)).await?;
-        Ok(deleted.is_some())
+        query::insert_view(&self.db, &id, content).await
     }
 }

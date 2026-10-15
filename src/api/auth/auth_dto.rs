@@ -98,6 +98,7 @@ pub struct RefreshRequest {
 
 /// Token pair returned by `login` and `refresh`.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct TokenResponse {
     /// Short-lived access token, sent in `Authorization: Bearer` on every
     /// protected request
@@ -121,6 +122,7 @@ pub struct TokenResponse {
 
 /// Generic confirmation message.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct MessageResponse {
     /// Human readable outcome of the operation
     #[schema(example = "user registered successfully")]

@@ -56,22 +56,3 @@ impl UpdateCategoryDto {
         }
     }
 }
-
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct CategoryResponse {
-    /// UUID identifier of the category
-    #[schema(example = "550e8400-e29b-41d4-a716-446655440000")]
-    pub id: String,
-    /// Category name
-    #[schema(example = "Vendite")]
-    pub name: String,
-}
-
-impl From<crate::api::categories::category_entity::Category> for CategoryResponse {
-    fn from(category: crate::api::categories::category_entity::Category) -> Self {
-        Self {
-            id: category.id,
-            name: category.name,
-        }
-    }
-}

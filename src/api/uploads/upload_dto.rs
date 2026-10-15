@@ -5,6 +5,7 @@ use crate::api::uploads::upload_entity::Asset;
 
 /// Metadata returned to the client after an upload.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct AssetResponse {
     /// UUID identifier of the asset
     #[schema(example = "550e8400-e29b-41d4-a716-446655440000")]

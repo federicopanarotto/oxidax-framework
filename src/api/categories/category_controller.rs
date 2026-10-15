@@ -5,9 +5,8 @@ use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::Response;
 
-use crate::api::categories::category_dto::{
-    CategoryResponse, CreateCategoryDto, UpdateCategoryDto,
-};
+use crate::api::categories::category_dto::{CreateCategoryDto, UpdateCategoryDto};
+use crate::api::categories::category_response::CategoryResponse;
 use crate::api::categories::category_service::CategoryService;
 use crate::errors::AppResult;
 use crate::framework::{PaginationQuery, ValidatedJson, ValidatedQuery, route};
@@ -53,6 +52,7 @@ pub async fn list_categories(
         (status = 503, description = "Database unavailable"),
     ),
 )]
+#[IsGranted]
 pub async fn create_category(
     State(service): State<Arc<CategoryService>>,
     ValidatedJson(dto): ValidatedJson<CreateCategoryDto>,
@@ -95,6 +95,7 @@ pub async fn get_category(
         (status = 503, description = "Database unavailable"),
     ),
 )]
+#[IsGranted]
 pub async fn update_category(
     State(service): State<Arc<CategoryService>>,
     Path(id): Path<String>,
@@ -115,6 +116,7 @@ pub async fn update_category(
         (status = 503, description = "Database unavailable"),
     ),
 )]
+#[IsGranted]
 pub async fn delete_category(
     State(service): State<Arc<CategoryService>>,
     Path(id): Path<String>,

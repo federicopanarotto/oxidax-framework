@@ -93,7 +93,7 @@ impl UploadService {
             self.uploader.remove(&asset.stored_name).await?;
             Ok(())
         } else {
-            Err(not_found(id))
+            Err(AppError::not_found("asset", id))
         }
     }
 
@@ -101,12 +101,8 @@ impl UploadService {
         self.repository
             .find_by_id(id)
             .await?
-            .ok_or_else(|| not_found(id))
+            .ok_or_else(|| AppError::not_found("asset", id))
     }
-}
-
-fn not_found(id: &str) -> AppError {
-    AppError::NotFound(format!("asset {id} not found"))
 }
 
 /// Current time as a Unix timestamp (seconds).

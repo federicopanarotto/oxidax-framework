@@ -109,8 +109,8 @@ async fn upload_download_delete_roundtrip() {
 
     let created = json_body(response).await;
     let id = created["id"].as_str().expect("id").to_string();
-    assert_eq!(created["original_name"], "hello.txt");
-    assert_eq!(created["content_type"], "text/plain");
+    assert_eq!(created["originalName"], "hello.txt");
+    assert_eq!(created["contentType"], "text/plain");
     assert!(created["description"].is_null());
     assert_eq!(created["size"], 11);
     assert_eq!(

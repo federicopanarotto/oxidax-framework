@@ -79,21 +79,3 @@ impl UpdateColorDto {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct ColorResponse {
-    /// UUID identifier
-    #[schema(example = "550e8400-e29b-41d4-a716-446655440000")]
-    pub id: String,
-    pub name: String,
-    pub hex: String,
-}
-
-impl From<crate::api::color::color_entity::Color> for ColorResponse {
-    fn from(entity: crate::api::color::color_entity::Color) -> Self {
-        Self {
-            id: entity.id,
-            name: entity.name,
-            hex: entity.hex,
-        }
-    }
-}

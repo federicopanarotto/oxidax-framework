@@ -1,22 +1,17 @@
 use async_trait::async_trait;
 
 use crate::api::places::place_entity::Place;
+use crate::api::places::place_response::PlaceResponse;
 use crate::errors::AppResult;
+use crate::framework::ViewRepository;
 
 /// Persistence contract for places.
 ///
-/// It is the only point that depends on the database: implementing this
-/// trait on a new backend (Postgres, SQLite, MongoDB...) leaves the service
-/// and controllers unchanged.
+/// It inherits the populated reads (`find`, `find_page`, `count`, `delete`)
+/// from [`ViewRepository`]; only the aggregate-specific writes are declared
+/// here.
 #[async_trait]
-pub trait PlaceRepository: Send + Sync {
-    async fn insert(&self, place: Place) -> AppResult<Place>;
-    async fn find_by_id(&self, id: &str) -> AppResult<Option<Place>>;
-    async fn find_all(&self) -> AppResult<Vec<Place>>;
-    /// One page of places: `offset` skipped, at most `limit` returned.
-    async fn find_page(&self, offset: u64, limit: u64) -> AppResult<Vec<Place>>;
-    /// Total number of places, used to fill the pagination metadata.
-    async fn count(&self) -> AppResult<u64>;
-    async fn replace(&self, id: &str, place: Place) -> AppResult<Option<Place>>;
-    async fn remove(&self, id: &str) -> AppResult<bool>;
+pub trait PlaceRepository: ViewRepository<Response = PlaceResponse> {
+    async fn insert(&self, place: Place) -> AppResult<PlaceResponse>;
+    async fn replace(&self, id: &str, place: Place) -> AppResult<Option<PlaceResponse>>;
 }

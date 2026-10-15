@@ -43,6 +43,11 @@ pub enum AppError {
 pub type AppResult<T> = Result<T, AppError>;
 
 impl AppError {
+    /// Conventional resource-missing error: `"<entity> <id> not found"`.
+    pub fn not_found(entity: &str, id: &str) -> Self {
+        Self::NotFound(format!("{entity} {id} not found"))
+    }
+
     /// Stable machine code, exposed in the response body.
     pub fn code(&self) -> &'static str {
         match self {

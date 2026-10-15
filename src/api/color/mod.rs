@@ -2,6 +2,7 @@ pub mod color_controller;
 pub mod color_dto;
 pub mod color_entity;
 pub mod color_repository;
+pub mod color_response;
 pub mod color_service;
 pub mod surreal_color_repository;
 

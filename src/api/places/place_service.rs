@@ -1,10 +1,10 @@
-use std::collections::HashMap;
 use std::sync::Arc;
 
 use di::injectable;
 
-use crate::api::places::place_dto::{CreatePlaceDto, PlaceResponse, UpdatePlaceDto};
+use crate::api::places::place_dto::{CreatePlaceDto, UpdatePlaceDto};
 use crate::api::places::place_repository::PlaceRepository;
+use crate::api::places::place_response::PlaceResponse;
 use crate::errors::{AppError, AppResult};
 use crate::lib::pagination::{Paged, Pagination};
 
@@ -20,35 +20,24 @@ pub struct PlaceService {
 
 impl PlaceService {
     pub async fn create(&self, dto: CreatePlaceDto) -> AppResult<PlaceResponse> {
-        let place = dto.into_entity();
-
-        self.repository.insert(place).await.map(Into::into)
+        self.repository.insert(dto.into_entity()).await
     }
 
     pub async fn get(&self, id: &str) -> AppResult<PlaceResponse> {
         self.repository
-            .find_by_id(id)
+            .find(id)
             .await?
-            .map(Into::into)
-            .ok_or_else(|| not_found(id))
-    }
-
-    pub async fn list(&self) -> AppResult<Vec<PlaceResponse>> {
-        self.repository
-            .find_all()
-            .await
-            .map(|places| places.into_iter().map(Into::into).collect())
+            .ok_or_else(|| AppError::not_found("place", id))
     }
 
     /// One page of places with the total count (sent as `X-TOTAL-LIST`).
     pub async fn list_page(&self, pagination: Pagination) -> AppResult<Paged<PlaceResponse>> {
         let total = self.repository.count().await?;
-        let places = self
+        let items = self
             .repository
             .find_page(pagination.offset(), pagination.limit())
             .await?;
 
-        let items = places.into_iter().map(Into::into).collect();
         Ok(Paged::new(items, total))
     }
 
@@ -58,41 +47,19 @@ impl PlaceService {
         self.repository
             .replace(id, place)
             .await?
-            .map(Into::into)
-            .ok_or_else(|| not_found(id))
+            .ok_or_else(|| AppError::not_found("place", id))
     }
 
     pub async fn delete(&self, id: &str) -> AppResult<()> {
-        if self.repository.remove(id).await? {
+        if self.repository.delete(id).await? {
             Ok(())
         } else {
-            Err(not_found(id))
+            Err(AppError::not_found("place", id))
         }
     }
 
-    /// Checks whether a place exists: used by the reports service to validate
-    /// the relationship before creating or updating a report.
+    /// Used by the reports service to validate the related place.
     pub async fn exists(&self, id: &str) -> AppResult<bool> {
-        Ok(self.repository.find_by_id(id).await?.is_some())
+        Ok(self.repository.find(id).await?.is_some())
     }
-
-    /// Retrieves a place without failing if absent: used by the reports service
-    /// to nest the `place` object in the response.
-    pub async fn find(&self, id: &str) -> AppResult<Option<PlaceResponse>> {
-        Ok(self.repository.find_by_id(id).await?.map(Into::into))
-    }
-
-    /// `id → place` index: decorates a list of reports with a single read,
-    /// avoiding N+1 queries per element.
-    pub async fn by_id(&self) -> AppResult<HashMap<String, PlaceResponse>> {
-        let mut index = HashMap::new();
-        for place in self.list().await? {
-            index.insert(place.id.clone(), place);
-        }
-        Ok(index)
-    }
-}
-
-fn not_found(id: &str) -> AppError {
-    AppError::NotFound(format!("place {id} not found"))
 }

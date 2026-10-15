@@ -89,16 +89,16 @@ async fn registered_session(app: &Router, email: &str, password: &str) -> Value 
 }
 
 fn access_token(tokens: &Value) -> String {
-    tokens["access_token"]
+    tokens["accessToken"]
         .as_str()
-        .expect("access_token")
+        .expect("accessToken")
         .to_string()
 }
 
 fn refresh_token(tokens: &Value) -> String {
-    tokens["refresh_token"]
+    tokens["refreshToken"]
         .as_str()
-        .expect("refresh_token")
+        .expect("refreshToken")
         .to_string()
 }
 
@@ -110,8 +110,8 @@ async fn register_returns_201_message_without_tokens() {
 
     assert_eq!(status, StatusCode::CREATED, "{body}");
     assert_eq!(body["message"], "user registered successfully");
-    assert!(body.get("access_token").is_none(), "{body}");
-    assert!(body.get("refresh_token").is_none(), "{body}");
+    assert!(body.get("accessToken").is_none(), "{body}");
+    assert!(body.get("refreshToken").is_none(), "{body}");
 }
 
 #[tokio::test]
@@ -192,9 +192,9 @@ async fn login_issues_token_pair() {
 
     assert!(!access_token(&tokens).is_empty());
     assert!(!refresh_token(&tokens).is_empty());
-    assert_eq!(tokens["token_type"], "Bearer");
+    assert_eq!(tokens["tokenType"], "Bearer");
     assert!(
-        tokens["expires_in"].as_u64().is_some_and(|value| value > 0),
+        tokens["expiresIn"].as_u64().is_some_and(|value| value > 0),
         "{tokens}"
     );
 }

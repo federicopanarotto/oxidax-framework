@@ -140,8 +140,8 @@ pub async fn access_token_for(app: &Router, email: &str) -> String {
     let body = json_body(response).await;
     assert_eq!(status, StatusCode::OK, "{body}");
 
-    body["access_token"]
+    body["accessToken"]
         .as_str()
-        .expect("access_token")
+        .expect("accessToken")
         .to_string()
 }

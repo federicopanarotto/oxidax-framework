@@ -104,8 +104,7 @@ impl Modify for ErrorExamples {
                         "message": message,
                     });
 
-                    let mut content =
-                        Content::new(Some(Ref::from_schema_name("ErrorResponse")));
+                    let mut content = Content::new(Some(Ref::from_schema_name("ErrorResponse")));
                     content.example = Some(example);
                     response
                         .content

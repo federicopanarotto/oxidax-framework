@@ -4,7 +4,8 @@ use axum::Json;
 use axum::extract::State;
 use axum::response::Response;
 
-use crate::api::users::user_dto::{UserListQueryDto, UserResponse};
+use crate::api::users::user_dto::UserListQueryDto;
+use crate::api::users::user_response::UserResponse;
 use crate::api::users::user_service::UserService;
 use crate::errors::AppResult;
 use crate::framework::{CurrentUser, PaginationQuery, ValidatedQuery, route};

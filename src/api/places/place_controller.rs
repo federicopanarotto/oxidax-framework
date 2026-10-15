@@ -5,7 +5,8 @@ use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::Response;
 
-use crate::api::places::place_dto::{CreatePlaceDto, PlaceResponse, UpdatePlaceDto};
+use crate::api::places::place_dto::{CreatePlaceDto, UpdatePlaceDto};
+use crate::api::places::place_response::PlaceResponse;
 use crate::api::places::place_service::PlaceService;
 use crate::errors::AppResult;
 use crate::framework::{PaginationQuery, ValidatedJson, ValidatedQuery, route};

@@ -5,7 +5,8 @@ use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::Response;
 
-use crate::api::reports::report_dto::{CreateReportDto, ReportResponse, UpdateReportDto};
+use crate::api::reports::report_dto::{CreateReportDto, UpdateReportDto};
+use crate::api::reports::report_response::ReportResponse;
 use crate::api::reports::report_service::ReportService;
 use crate::errors::AppResult;
 use crate::framework::{CurrentUser, PaginationQuery, ValidatedJson, ValidatedQuery, route};

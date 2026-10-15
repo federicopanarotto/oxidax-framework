@@ -10,13 +10,15 @@ use crate::support::{app, authorized_json_request, json_body, json_request, mint
 #[tokio::test]
 async fn categories_full_crud_cycle() {
     let app = app().await;
+    let token = mint_access_token("550e8400-e29b-41d4-a716-446655440000").await;
 
     let response = app
         .clone()
-        .oneshot(json_request(
+        .oneshot(authorized_json_request(
             "POST",
             "/api/categories",
             json!({"name": "Vendite"}),
+            &token,
         ))
         .await
         .unwrap();
@@ -60,10 +62,11 @@ async fn categories_full_crud_cycle() {
 
     let response = app
         .clone()
-        .oneshot(json_request(
+        .oneshot(authorized_json_request(
             "PUT",
             &format!("/api/categories/{id}"),
             json!({"name": "Marketing"}),
+            &token,
         ))
         .await
         .unwrap();
@@ -78,6 +81,7 @@ async fn categories_full_crud_cycle() {
             Request::builder()
                 .method("DELETE")
                 .uri(format!("/api/categories/{id}"))
+                .header("authorization", format!("Bearer {token}"))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -104,10 +108,11 @@ async fn report_accepts_existing_category() {
 
     let response = app
         .clone()
-        .oneshot(json_request(
+        .oneshot(authorized_json_request(
             "POST",
             "/api/categories",
             json!({"name": "Finanza"}),
+            &token,
         ))
         .await
         .unwrap();
@@ -210,10 +215,11 @@ async fn update_can_remove_category() {
 
     let response = app
         .clone()
-        .oneshot(json_request(
+        .oneshot(authorized_json_request(
             "POST",
             "/api/categories",
             json!({"name": "Temporanea"}),
+            &token,
         ))
         .await
         .unwrap();

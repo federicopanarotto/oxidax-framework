@@ -2,8 +2,9 @@ use std::sync::Arc;
 
 use di::injectable;
 
-use crate::api::color::color_dto::{ColorResponse, CreateColorDto, UpdateColorDto};
+use crate::api::color::color_dto::{CreateColorDto, UpdateColorDto};
 use crate::api::color::color_repository::ColorRepository;
+use crate::api::color::color_response::ColorResponse;
 use crate::errors::{AppError, AppResult};
 use crate::lib::pagination::{Paged, Pagination};
 
@@ -15,23 +16,14 @@ pub struct ColorService {
 
 impl ColorService {
     pub async fn create(&self, dto: CreateColorDto) -> AppResult<ColorResponse> {
-        let item = dto.into_entity();
-        self.repository.insert(item).await.map(Into::into)
+        self.repository.insert(dto.into_entity()).await
     }
 
     pub async fn get(&self, id: &str) -> AppResult<ColorResponse> {
         self.repository
-            .find_by_id(id)
+            .find(id)
             .await?
-            .map(Into::into)
-            .ok_or_else(|| not_found(id))
-    }
-
-    pub async fn list(&self) -> AppResult<Vec<ColorResponse>> {
-        self.repository
-            .find_all()
-            .await
-            .map(|items| items.into_iter().map(Into::into).collect())
+            .ok_or_else(|| AppError::not_found("color", id))
     }
 
     /// One page of colors with the total count (sent as `X-TOTAL-LIST`).
@@ -42,28 +34,23 @@ impl ColorService {
             .find_page(pagination.offset(), pagination.limit())
             .await?;
 
-        let items = items.into_iter().map(Into::into).collect();
         Ok(Paged::new(items, total))
     }
 
     pub async fn update(&self, id: &str, dto: UpdateColorDto) -> AppResult<ColorResponse> {
         let item = dto.into_entity(id.to_string());
+
         self.repository
             .replace(id, item)
             .await?
-            .map(Into::into)
-            .ok_or_else(|| not_found(id))
+            .ok_or_else(|| AppError::not_found("color", id))
     }
 
     pub async fn delete(&self, id: &str) -> AppResult<()> {
-        if self.repository.remove(id).await? {
+        if self.repository.delete(id).await? {
             Ok(())
         } else {
-            Err(not_found(id))
+            Err(AppError::not_found("color", id))
         }
     }
-}
-
-fn not_found(id: &str) -> AppError {
-    AppError::NotFound(format!("color {id} not found"))
 }

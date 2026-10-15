@@ -18,6 +18,8 @@ pub mod framework;
 pub mod middlewares;
 pub mod pagination;
 pub mod registry;
+pub mod repository;
+pub mod response;
 pub mod upload;
 pub mod validators;
 

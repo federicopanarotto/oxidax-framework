@@ -2,6 +2,7 @@ pub mod place_controller;
 pub mod place_dto;
 pub mod place_entity;
 pub mod place_repository;
+pub mod place_response;
 pub mod place_service;
 pub mod surreal_place_repository;
 
