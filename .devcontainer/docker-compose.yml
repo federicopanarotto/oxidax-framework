@@ -11,22 +11,21 @@ services:
     command: sleep infinity
     ports:
       - "3000:3000"
+    # NOTE: no `env_file: ../.env` here on purpose. The application loads `.env`
+    # itself via dotenvy at startup, so changes to `.env` are picked up on every
+    # `cargo dev` restart. Injecting it here too would freeze the values at
+    # container creation (dotenvy never overrides already-set variables).
     environment:
       RUST_LOG: info,oxidax=debug,oxidax_core=debug
-      SERVER_ADDR: 0.0.0.0:3000
-      DB_BACKEND: surreal
-      SURREAL_URL: ws://surrealdb:12129
-      SURREAL_USER: root
-      SURREAL_PASS: root
       CARGO_TARGET_DIR: /cargo-target
-    depends_on:
-      - surrealdb
+    # depends_on:
+    #   - surrealdb
 
-  surrealdb:
-    image: surrealdb/surrealdb:latest
-    command: start --user root --pass root --bind 0.0.0.0:12129
-    ports:
-      - "12129:12129"
+  # surrealdb:
+  #   image: surrealdb/surrealdb:latest
+  #   command: start --user root --pass root --bind 0.0.0.0:12129
+  #   ports:
+  #     - "12129:12129"
 
 volumes:
   cargo-registry:
