@@ -9,6 +9,9 @@ pub struct AssetResponse {
     /// UUID identifier of the asset
     #[schema(example = "550e8400-e29b-41d4-a716-446655440000")]
     pub id: String,
+    /// Optional free-text description provided with the upload
+    #[schema(example = "Monthly report")]
+    pub description: Option<String>,
     /// Original file name
     #[schema(example = "report.pdf")]
     pub original_name: String,
@@ -33,6 +36,7 @@ impl From<Asset> for AssetResponse {
         Self {
             url: format!("/api/upload/{}", asset.id),
             id: asset.id,
+            description: asset.description,
             original_name: asset.original_name,
             content_type: asset.content_type,
             size: asset.size,

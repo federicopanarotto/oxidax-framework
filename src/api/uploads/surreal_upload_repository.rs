@@ -15,6 +15,7 @@ const TABLE: &str = "asset";
 #[derive(Debug, Serialize, Deserialize, SurrealValue)]
 struct AssetRow {
     id: RecordId,
+    description: Option<String>,
     stored_name: String,
     original_name: String,
     content_type: String,
@@ -28,6 +29,7 @@ struct AssetRow {
 #[derive(Debug, Serialize, Deserialize, SurrealValue)]
 struct AssetContent {
     stored_name: String,
+    description: Option<String>,
     original_name: String,
     content_type: String,
     size: i64,
@@ -55,6 +57,7 @@ impl SurrealAssetRepository {
 fn into_entity(row: AssetRow) -> Asset {
     Asset {
         id: record_key_to_string(row.id.key),
+        description: row.description,
         stored_name: row.stored_name,
         original_name: row.original_name,
         content_type: row.content_type,
@@ -67,6 +70,7 @@ fn into_entity(row: AssetRow) -> Asset {
 fn content(asset: &Asset) -> AssetContent {
     AssetContent {
         stored_name: asset.stored_name.clone(),
+        description: asset.description.clone(),
         original_name: asset.original_name.clone(),
         content_type: asset.content_type.clone(),
         size: asset.size as i64,

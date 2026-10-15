@@ -111,6 +111,7 @@ async fn upload_download_delete_roundtrip() {
     let id = created["id"].as_str().expect("id").to_string();
     assert_eq!(created["original_name"], "hello.txt");
     assert_eq!(created["content_type"], "text/plain");
+    assert!(created["description"].is_null());
     assert_eq!(created["size"], 11);
     assert_eq!(
         created["url"].as_str().unwrap(),
@@ -166,6 +167,31 @@ async fn upload_download_delete_roundtrip() {
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn upload_persists_the_description_field() {
+    let app = upload_app(&test_config()).await;
+    let token = access_token_for(&app, "described@example.com").await;
+
+    let body = multipart(
+        BOUNDARY,
+        &[
+            file_part("file", "report.txt", "text/plain", b"data"),
+            Part {
+                name: "description",
+                filename: None,
+                content_type: None,
+                data: b"Monthly report",
+            },
+        ],
+    );
+    let response = app
+        .oneshot(upload_request(BOUNDARY, body, Some(&token)))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::CREATED);
+    assert_eq!(json_body(response).await["description"], "Monthly report");
 }
 
 #[tokio::test]

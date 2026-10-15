@@ -33,6 +33,7 @@ impl UploadService {
 
         let asset = Asset {
             id: Uuid::new_v4().to_string(),
+            description: form.field("description").map(str::to_string),
             stored_name: file.stored_name.clone(),
             original_name: file.original_name.clone(),
             content_type: file

@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Asset {
     pub id: String,
+    pub description: Option<String>,
     /// Name of the file inside the assets directory.
     pub stored_name: String,
     /// Original client file name.
